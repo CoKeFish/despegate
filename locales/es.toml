@@ -1,0 +1,261 @@
+# Español.
+
+[day]
+mon = "lun"
+tue = "mar"
+wed = "mié"
+thu = "jue"
+fri = "vie"
+sat = "sáb"
+sun = "dom"
+
+[days]
+every = "todos los días"
+never = "nunca"
+
+[effect]
+lock = "bloquea la pantalla"
+lock_and_close = "bloquea la pantalla y cierra {apps}"
+close = "cierra {apps}"
+
+[rule]
+describe = "{name}: {days} {start}-{end}, {effect}"
+added = "Regla añadida: {rule}"
+active_now = "Está activa ahora mismo, hasta {until}."
+removed = "Regla '{name}' eliminada"
+none = "Aún no hay reglas. Añade una con `despegate rule add`."
+
+[now]
+started = "Bloqueo iniciado: {effect} hasta {until}. No se puede cancelar."
+
+[reasons]
+saved = "Razones guardadas. Se mostrarán en la pantalla de bloqueo y antes de desinstalar."
+none = 'Aún no hay razones. Escríbelas con `despegate reasons set "..."`.'
+
+[set]
+done = "{key} ahora vale {value} (antes {old})"
+no_emergency_warning = "Aviso: sin pausa de emergencia, de una regla de bloqueo mal puesta solo se sale esperando a que termine."
+
+[break]
+set = "Descansos activados: la pantalla se bloquea {rest} min tras cada {work} min de uso."
+off = "Descansos desactivados."
+
+[allowance]
+set = "{app} se puede usar {minutes} min al día."
+removed = "{app} ya no tiene límite diario."
+
+[language]
+set = "Idioma: {name}."
+auto = "El idioma sigue al de Windows ({name})."
+
+[why]
+block_active = "el bloqueo '{name}' está activo hasta {until}"
+block_imminent = "el bloqueo '{name}' empieza a las {start} (los cambios se cierran {lead} min antes de un bloqueo)"
+break_active = "hay un descanso en curso hasta las {until}"
+break_imminent = "toca descanso tras {left} más de uso"
+
+[error]
+not_agent = "esta petición solo puede venir del agente"
+app_empty = "nombre de aplicación vacío"
+app_protected = "{app} es un proceso del sistema y no se puede bloquear"
+name_required = "la regla necesita un nombre"
+name_taken = "ya existe una regla llamada '{name}'"
+days_required = "la regla necesita al menos un día"
+same_time = "la hora de inicio y la de fin son la misma"
+no_effect = "la regla no hace nada: añade --lock, --app o ambos"
+no_rule = "no hay ninguna regla llamada '{name}'"
+rule_active = "'{name}' está activa hasta {until} y no se puede eliminar ahora"
+rule_imminent = "'{name}' empieza a las {start}; las reglas no se pueden eliminar en los {lead} min previos a su inicio"
+duration_range = "la duración debe estar entre 1 minuto y {hours} horas"
+nothing_to_block = "no hay nada que bloquear: añade --lock, --app o ambos"
+loosens = "esto afloja despegate y {why}"
+max = "el máximo es {max}"
+emergency_min = "el mínimo es 1; pon emergency-chars a 0 para desactivar la pausa"
+break_work_range = "el tiempo entre descansos debe estar entre 5 minutos y 8 horas"
+break_rest_range = "el descanso debe durar entre 1 minuto y 2 horas"
+break_already_off = "los descansos ya están desactivados"
+allowance_range = "el límite debe estar entre 1 minuto y 24 horas"
+no_allowance = "{app} no tiene límite diario"
+allowance_used = "{app} ya se usó hoy ({used}); su límite se puede aflojar mañana, antes de abrirlo"
+language = "idioma desconocido '{code}'; disponibles: {list}"
+reasons_empty = "las razones están vacías"
+save = "no se pudo guardar la configuración: {error}"
+daemon_unreachable = "no se puede hablar con el daemon: {error}"
+no_daemon = "el daemon no está en marcha y sin él no se puede cambiar la configuración ({error}). Si despegate está instalado, se reinicia en unos segundos; inténtalo de nuevo."
+
+[status]
+daemon_running = "daemon: en marcha"
+daemon_stopped = "daemon: PARADO (no se está aplicando nada; ejecuta `despegate install`)"
+paused = "pausa de emergencia hasta las {until}"
+active_none = "activo ahora: nada"
+active = "activo ahora:"
+active_item = "  {name}: {effect} hasta {until}"
+break_active = "  descanso: la pantalla está bloqueada hasta las {until}"
+next = "siguiente: '{name}' empieza {when}"
+rules_none = "reglas: ninguna (añade una con `despegate rule add`)"
+rules = "reglas:"
+breaks_off = "descansos: desactivados (actívalos con `despegate break set`)"
+breaks = "descansos: {rest} min tras cada {work} min de uso; el próximo tras {left} más"
+allowances_none = "límites diarios: ninguno (añade uno con `despegate allowance set`)"
+allowances = "límites diarios:"
+allowance_item = "  {app}: {minutes} min al día, quedan {left} hoy"
+emergency_off = "desactivada"
+emergency_on = "{minutes} min tras teclear {chars} caracteres"
+settings = "ajustes: margen {lead} min, aviso {warn} min, pausa de emergencia {emergency}"
+language = "idioma: {name}"
+language_auto = "idioma: {name} (el de Windows)"
+reasons_none = "razones: sin escribir (hazlo con `despegate reasons set`)"
+reasons = "razones:"
+
+[banner]
+paused = "Pausa de emergencia: despegate vuelve en {left}"
+blocked = "{app} está bloqueado hasta las {until}"
+allowance_spent = "{app}: se acabó el tiempo de hoy"
+rule_soon = "'{name}' empieza en {left}. Guarda tu trabajo."
+break_soon = "Descanso en {left}. Busca un buen punto para parar."
+allowance_soon = "{app}: quedan {left} hoy"
+
+[lock]
+title = "Despégate."
+subtitle = "Bloqueado hasta las {until}  ·  faltan {left}"
+why = "POR QUÉ LO INSTALASTE"
+no_reasons = "No has escrito por qué instalaste despegate.\nHazlo con: despegate reasons set \"...\""
+emergency = "¿Emergencia? Teclea este texto tal cual para pausar despegate {minutes} minutos:"
+
+[install]
+needs_admin = "La instalación necesita permisos de administrador; aparecerá un aviso de UAC."
+missing_exe = "falta {exe} junto al instalador; compila antes los dos binarios"
+stopping = "Deteniendo el daemon si está en marcha..."
+failed = "la instalación falló en {what}: {error}"
+denied = "no se concedieron permisos de administrador"
+elevated_failed = "el paso con permisos de administrador no terminó bien"
+done = "despegate está instalado y en marcha."
+program = "  programa:      {path}"
+config = "  configuración: {path}"
+next = "Abre una terminal nueva y empieza con:"
+example_reasons = 'despegate reasons set "por qué quiero esto"'
+
+[uninstall]
+not_installed = "despegate no está instalado"
+needs_admin = "La desinstalación necesita permisos de administrador; aparecerá un aviso de UAC."
+phrase = "desinstalar despegate"
+about = "Estás a punto de desinstalar despegate."
+no_reasons = "Nunca escribiste por qué lo instalaste."
+your_reasons = "Por esto lo instalaste, con tus propias palabras:"
+confirm = "Si aun así quieres quitarlo, escribe: {phrase}"
+not_confirmed = "Sin confirmar. despegate sigue instalado."
+path_failed = "No se pudo quitar {dir} del PATH: {error}"
+done = "despegate se ha desinstalado."
+
+[pause]
+prompt = "Pulsa Intro para cerrar esta ventana."
+
+[cli]
+about = "Te obliga a despegarte del computador"
+long_about = "Te obliga a despegarte del computador.\n\nLos bloqueos vienen de reglas recurrentes (`rule`), bloqueos inmediatos (`now`), descansos forzados (`break`) y límites diarios por programa (`allowance`). Mientras un bloqueo está activo o a punto de empezar, no se acepta nada que afloje despegate. La salida es `uninstall`, que primero te muestra tus propias razones."
+help_flag = "Muestra la ayuda"
+version_flag = "Muestra la versión"
+
+[cli.heading]
+command = "COMANDO"
+usage = "Uso:"
+commands = "Comandos"
+options = "Opciones"
+arguments = "Argumentos"
+
+[cli.status]
+about = "Muestra qué está activo, qué viene después y la configuración"
+
+[cli.rule]
+about = "Gestiona los bloqueos recurrentes"
+
+[cli.rule.add]
+about = "Añade un bloqueo recurrente"
+
+[cli.rule.add.arg]
+name = "Un nombre a tu gusto para la regla"
+from = "Hora de inicio, HH:MM"
+to = "Hora de fin, HH:MM (si es anterior a --from, termina al día siguiente)"
+days = "Días en que empieza: all, weekdays, weekends, mon-fri o mon,wed,sat"
+lock = "Ocupa toda la pantalla"
+apps = "Programa a cerrar (repetible o separado por comas), p. ej. steam.exe"
+
+[cli.rule.list]
+about = "Lista las reglas"
+
+[cli.rule.remove]
+about = "Elimina una regla (se rechaza si está activa o a punto de empezar)"
+
+[cli.rule.remove.arg]
+name = "Nombre de la regla"
+
+[cli.now]
+about = "Empieza un bloqueo ahora mismo; no se puede cancelar"
+
+[cli.now.arg]
+minutes = "Cuánto dura, p. ej. 45m, 2h, 1h30m"
+lock = "Ocupa toda la pantalla"
+apps = "Programa a cerrar (repetible o separado por comas), p. ej. steam.exe"
+
+[cli.break]
+about = "Descansos forzados tras un rato de uso continuo"
+
+[cli.break.set]
+about = "Bloquea la pantalla un rato tras cada tramo de uso"
+long_about = "Bloquea la pantalla un rato tras cada tramo de uso.\n\nSolo cuenta el tiempo con teclado o ratón. Levantarte por tu cuenta durante lo que dura el descanso cuenta como haberlo tomado."
+
+[cli.break.set.arg]
+every = "Uso permitido entre descansos, p. ej. 50m"
+rest = "Duración del descanso, p. ej. 10m"
+
+[cli.break.off]
+about = "Desactiva los descansos forzados"
+
+[cli.allowance]
+about = "Límites de tiempo diarios para programas concretos"
+
+[cli.allowance.set]
+about = "Limita cuánto se puede usar un programa al día"
+long_about = "Limita cuánto se puede usar un programa al día.\n\nSolo cuenta el tiempo con la ventana del programa en primer plano. Cuando se agota, el programa se cierra, y se vuelve a cerrar si lo reabres, hasta el día siguiente."
+
+[cli.allowance.set.arg]
+app = "Nombre del ejecutable, p. ej. hearthstone.exe"
+minutes = "Tiempo al día, p. ej. 60m o 1h30m"
+
+[cli.allowance.remove]
+about = "Quita el límite diario de un programa"
+
+[cli.allowance.remove.arg]
+app = "Nombre del ejecutable"
+
+[cli.reasons]
+about = "El mensaje con tus razones para instalar despegate"
+
+[cli.reasons.set]
+about = "Escribe tus razones; sin texto, las lee de la entrada estándar"
+
+[cli.reasons.set.arg]
+text = "Tus razones, con tus propias palabras"
+
+[cli.reasons.show]
+about = "Muestra tus razones"
+
+[cli.language]
+about = "Muestra o elige el idioma"
+
+[cli.language.arg]
+code = "Un código de idioma como en o es, o auto para seguir al de Windows"
+
+[cli.set]
+about = "Cambia un ajuste"
+long_about = "Cambia un ajuste.\n\n  lead-minutes       minutos antes de un bloqueo en los que ya no se puede aflojar nada\n  warn-minutes       minutos antes de un bloqueo en que aparece el aviso\n  emergency-chars    caracteres a teclear en la pantalla de bloqueo para una pausa de emergencia (0 la desactiva)\n  emergency-minutes  duración de la pausa de emergencia"
+
+[cli.set.arg]
+key = "lead-minutes, warn-minutes, emergency-chars o emergency-minutes"
+value = "El nuevo valor"
+
+[cli.install]
+about = "Instala despegate para que arranque con Windows y resista que lo paren"
+
+[cli.uninstall]
+about = "Quita despegate, después de leer tus razones"

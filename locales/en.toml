@@ -1,0 +1,262 @@
+# English. This is the reference catalog: every other language must have
+# exactly these keys, with the same {placeholders}.
+
+[day]
+mon = "Mon"
+tue = "Tue"
+wed = "Wed"
+thu = "Thu"
+fri = "Fri"
+sat = "Sat"
+sun = "Sun"
+
+[days]
+every = "every day"
+never = "never"
+
+[effect]
+lock = "locks the screen"
+lock_and_close = "locks the screen and closes {apps}"
+close = "closes {apps}"
+
+[rule]
+describe = "{name}: {days} {start}-{end}, {effect}"
+added = "Added {rule}"
+active_now = "It is active right now, until {until}."
+removed = "Removed rule '{name}'"
+none = "No rules yet. Add one with `despegate rule add`."
+
+[now]
+started = "Block started: {effect} until {until}. It cannot be cancelled."
+
+[reasons]
+saved = "Reasons saved. They will be shown on the lock screen and before uninstalling."
+none = 'No reasons yet. Write them with `despegate reasons set "..."`.'
+
+[set]
+done = "{key} set to {value} (was {old})"
+no_emergency_warning = "Warning: with no emergency pause, a mistaken lock rule can only be escaped by waiting it out."
+
+[break]
+set = "Breaks on: the screen locks for {rest} min after every {work} min of use."
+off = "Breaks turned off."
+
+[allowance]
+set = "{app} may be used {minutes} min per day."
+removed = "{app} no longer has a daily limit."
+
+[language]
+set = "Language set to {name}."
+auto = "Language follows Windows ({name})."
+
+[why]
+block_active = "block '{name}' is active until {until}"
+block_imminent = "block '{name}' starts at {start} (changes close {lead} min before a block)"
+break_active = "a break is under way until {until}"
+break_imminent = "a break is due after {left} more of use"
+
+[error]
+not_agent = "this request can only come from the agent"
+app_empty = "empty application name"
+app_protected = "{app} is a system process and cannot be blocked"
+name_required = "the rule needs a name"
+name_taken = "a rule named '{name}' already exists"
+days_required = "the rule needs at least one day"
+same_time = "start and end are the same time"
+no_effect = "the rule does nothing: add --lock, --app, or both"
+no_rule = "no rule named '{name}'"
+rule_active = "'{name}' is active until {until} and cannot be removed now"
+rule_imminent = "'{name}' starts at {start}; rules cannot be removed within {lead} min of starting"
+duration_range = "duration must be between 1 minute and {hours} hours"
+nothing_to_block = "nothing to block: add --lock, --app, or both"
+loosens = "this loosens despegate and {why}"
+max = "the maximum is {max}"
+emergency_min = "the minimum is 1; set emergency-chars to 0 to disable the pause"
+break_work_range = "the time between breaks must be between 5 minutes and 8 hours"
+break_rest_range = "the break must last between 1 minute and 2 hours"
+break_already_off = "breaks are already off"
+allowance_range = "the allowance must be between 1 minute and 24 hours"
+no_allowance = "{app} has no daily limit"
+allowance_used = "{app} was already used today ({used}); its limit can be loosened tomorrow, before you open it"
+language = "unknown language '{code}'; available: {list}"
+reasons_empty = "the reasons are empty"
+save = "could not save the config: {error}"
+daemon_unreachable = "cannot talk to the daemon: {error}"
+no_daemon = "the daemon is not running and the config cannot be changed without it ({error}). If despegate is installed it restarts within seconds; try again."
+
+[status]
+daemon_running = "daemon: running"
+daemon_stopped = "daemon: NOT running (nothing is being enforced; run `despegate install`)"
+paused = "emergency pause until {until}"
+active_none = "active now: nothing"
+active = "active now:"
+active_item = "  {name}: {effect} until {until}"
+break_active = "  break: the screen is locked until {until}"
+next = "next: '{name}' starts {when}"
+rules_none = "rules: none (add one with `despegate rule add`)"
+rules = "rules:"
+breaks_off = "breaks: off (turn them on with `despegate break set`)"
+breaks = "breaks: {rest} min after every {work} min of use; next one after {left} more"
+allowances_none = "allowances: none (add one with `despegate allowance set`)"
+allowances = "allowances:"
+allowance_item = "  {app}: {minutes} min per day, {left} left today"
+emergency_off = "disabled"
+emergency_on = "{minutes} min after typing {chars} characters"
+settings = "settings: lead {lead} min, warning {warn} min, emergency pause {emergency}"
+language = "language: {name}"
+language_auto = "language: {name} (following Windows)"
+reasons_none = "reasons: not set (write them with `despegate reasons set`)"
+reasons = "reasons:"
+
+[banner]
+paused = "Emergency pause: despegate resumes in {left}"
+blocked = "{app} is blocked until {until}"
+allowance_spent = "{app}: today's time is used up"
+rule_soon = "'{name}' starts in {left}. Save your work."
+break_soon = "Break in {left}. Find a stopping point."
+allowance_soon = "{app}: {left} left today"
+
+[lock]
+title = "Despégate."
+subtitle = "Blocked until {until}  ·  {left} left"
+why = "WHY YOU SET THIS UP"
+no_reasons = "You have not written down why you installed despegate.\nDo it with: despegate reasons set \"...\""
+emergency = "Emergency? Type this text exactly to pause despegate for {minutes} minutes:"
+
+[install]
+needs_admin = "Installing needs administrator rights; a UAC prompt will appear."
+missing_exe = "{exe} is missing next to the installer; build both binaries first"
+stopping = "Stopping any running daemon..."
+failed = "installation failed at {what}: {error}"
+denied = "administrator rights were not granted"
+elevated_failed = "the elevated step did not complete"
+done = "despegate is installed and running."
+program = "  program: {path}"
+config = "  config:  {path}"
+next = "Open a new terminal and start with:"
+example_reasons = 'despegate reasons set "why I want this"'
+
+[uninstall]
+not_installed = "despegate is not installed"
+needs_admin = "Uninstalling needs administrator rights; a UAC prompt will appear."
+phrase = "uninstall despegate"
+about = "You are about to uninstall despegate."
+no_reasons = "You never wrote down why you installed it."
+your_reasons = "This is why you installed it, in your own words:"
+confirm = "If you still want to remove it, type: {phrase}"
+not_confirmed = "Not confirmed. despegate stays installed."
+path_failed = "Could not remove {dir} from PATH: {error}"
+done = "despegate has been uninstalled."
+
+[pause]
+prompt = "Press Enter to close this window."
+
+[cli]
+about = "Forces you to step away from the computer"
+long_about = "Forces you to step away from the computer.\n\nBlocks come from recurring rules (`rule`), on-the-spot blocks (`now`), forced breaks (`break`) and daily limits per program (`allowance`). While a block is active, or about to start, nothing that loosens despegate is accepted. The way out is `uninstall`, which shows you your own reasons first."
+help_flag = "Print help"
+version_flag = "Print version"
+
+[cli.heading]
+command = "COMMAND"
+usage = "Usage:"
+commands = "Commands"
+options = "Options"
+arguments = "Arguments"
+
+[cli.status]
+about = "Show what is active, what comes next, and the configuration"
+
+[cli.rule]
+about = "Manage recurring blocks"
+
+[cli.rule.add]
+about = "Add a recurring block"
+
+[cli.rule.add.arg]
+name = "A name of your choice for the rule"
+from = "Start time, HH:MM"
+to = "End time, HH:MM (earlier than --from means it ends the next day)"
+days = "Days it starts on: all, weekdays, weekends, mon-fri, or mon,wed,sat"
+lock = "Take over the whole screen"
+apps = "Program to close (repeatable or comma-separated), e.g. steam.exe"
+
+[cli.rule.list]
+about = "List the rules"
+
+[cli.rule.remove]
+about = "Remove a rule (refused while it is active or about to start)"
+
+[cli.rule.remove.arg]
+name = "Name of the rule"
+
+[cli.now]
+about = "Start a block right now; it cannot be cancelled"
+
+[cli.now.arg]
+minutes = "How long, e.g. 45m, 2h, 1h30m"
+lock = "Take over the whole screen"
+apps = "Program to close (repeatable or comma-separated), e.g. steam.exe"
+
+[cli.break]
+about = "Forced breaks after a stretch of continuous use"
+
+[cli.break.set]
+about = "Lock the screen for a while after every stretch of use"
+long_about = "Lock the screen for a while after every stretch of use.\n\nOnly time at the keyboard or mouse counts. Stepping away on your own for as long as the break lasts counts as taking it."
+
+[cli.break.set.arg]
+every = "Use allowed between breaks, e.g. 50m"
+rest = "Length of the break, e.g. 10m"
+
+[cli.break.off]
+about = "Turn forced breaks off"
+
+[cli.allowance]
+about = "Daily time limits for individual programs"
+
+[cli.allowance.set]
+about = "Limit how long a program may be used per day"
+long_about = "Limit how long a program may be used per day.\n\nOnly time with the program's window in front counts. When the time is used up the program is closed, and closed again if reopened, until the next day."
+
+[cli.allowance.set.arg]
+app = "Executable name, e.g. hearthstone.exe"
+minutes = "Time per day, e.g. 60m or 1h30m"
+
+[cli.allowance.remove]
+about = "Remove a program's daily limit"
+
+[cli.allowance.remove.arg]
+app = "Executable name"
+
+[cli.reasons]
+about = "The message with your reasons for installing despegate"
+
+[cli.reasons.set]
+about = "Write your reasons; with no text, reads them from standard input"
+
+[cli.reasons.set.arg]
+text = "Your reasons, in your own words"
+
+[cli.reasons.show]
+about = "Print your reasons"
+
+[cli.language]
+about = "Show or choose the language"
+
+[cli.language.arg]
+code = "A language code such as en or es, or auto to follow Windows"
+
+[cli.set]
+about = "Change a setting"
+long_about = "Change a setting.\n\n  lead-minutes       minutes before a block during which nothing can be loosened\n  warn-minutes       minutes before a block when the warning banner appears\n  emergency-chars    characters to type on the lock screen for an emergency pause (0 disables it)\n  emergency-minutes  length of the emergency pause"
+
+[cli.set.arg]
+key = "lead-minutes, warn-minutes, emergency-chars or emergency-minutes"
+value = "The new value"
+
+[cli.install]
+about = "Install despegate so it starts with Windows and resists being stopped"
+
+[cli.uninstall]
+about = "Remove despegate, after reading your reasons"

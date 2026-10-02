@@ -12,3 +12,9 @@ Desktop.ini
 .env
 .env.*
 !.env.example
+
+# Rust
+/target/
+
+# Development daemon state (see README)
+/.dev/
