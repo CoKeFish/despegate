@@ -1,3 +1,5 @@
+<img src="assets/logo.svg" width="72" alt="">
+
 # despegate
 
 > *Despégate* (Spanish): "unglue yourself".
@@ -18,11 +20,12 @@ The Windows desktop version works. It is young; expect rough edges. A mobile com
 - **Blocks right now.** `despegate now --for 45m --lock` starts a block that cannot be cancelled.
 - **Forces breaks.** After a stretch of continuous use the screen locks for a while. Only time at the keyboard or mouse counts, and stepping away on your own for as long as the break lasts counts as taking it.
 - **Limits programs per day.** A program can be given a daily allowance, counted only while its window is in front. When it is spent the program is closed until the next day.
-- **Locks the screen.** A lock covers every monitor, stays on top, swallows Alt+Tab, the Windows key and Alt+F4, and closes Task Manager. It shows the time left and your own reasons for installing despegate.
+- **Locks the screen.** A lock covers every monitor, stays on top, swallows Alt+Tab, the Windows key and Alt+F4, and closes Task Manager. It shows the time left and your reasons for installing despegate: your own words, and the photos and videos you add to them.
 - **Closes programs.** A block can name executables (`steam.exe`, ...). They are closed while the block is active, and closed again if you reopen them.
 - **Warns you first.** A banner appears a few minutes before a block, a break, or the end of an allowance.
 - **Resists you.** Once installed it runs as a Windows service under the SYSTEM account. It refuses stop requests, an ordinary user cannot end it, and Windows starts it again if an administrator does. Its files cannot be edited behind its back. While a block is active or about to start, nothing that loosens it is accepted.
 - **Speaks your language.** English and Spanish so far; it follows Windows unless told otherwise.
+- **Has a settings window.** Everything the CLI does, in a window — `despegate ui`, or *despegate* in the Start menu.
 
 ## The two ways out
 
@@ -40,12 +43,13 @@ cargo build --release
 target\release\despegate.exe install
 ```
 
-`install` asks for administrator rights. It copies the two executables to `C:\Program Files\despegate`, adds that folder to `PATH`, and registers the service. Open a new terminal afterwards.
+`install` asks for administrator rights. It copies the executables to `C:\Program Files\despegate`, adds that folder to `PATH`, registers the service and puts *despegate* in the Start menu. Open a new terminal afterwards. The settings window needs the WebView2 runtime, which Windows 11 and recent Windows 10 include.
 
 ## Use
 
 ```
 despegate reasons set "Sleep eight hours. Be on time for the people waiting for me."
+despegate reasons add "C:\Photos\the kids.jpg"      # photos and videos go with the words
 
 # Lock the screen every night; the window ends the next morning.
 despegate rule add sleep --from 23:00 --to 07:00 --lock
@@ -67,6 +71,8 @@ despegate status
 
 `--days` takes `all`, `weekdays`, `weekends`, a range like `mon-fri`, or a list like `mon,wed,sat`. A rule can combine `--lock` and `--app`. Every command explains itself with `--help`.
 
+The same things can be done from the settings window (`despegate ui`). It opens on the week: a timetable with every rule painted on it and a mark at the current moment, so one glance says when despegate will next step in. Settings apply as soon as they are changed; what cannot be undone asks once. Everything the window does is a CLI command underneath, so the two never disagree.
+
 ### What can be changed, and when
 
 Anything that makes despegate stricter is accepted at any time: a new rule (even one that is active immediately), shorter work periods, a smaller allowance.
@@ -84,6 +90,10 @@ Anything that loosens it is refused while a block or break is active or about to
 | `emergency-chars` | 80 | Length of the text to type for an emergency pause; `0` disables it |
 | `emergency-minutes` | 5 | Length of the emergency pause |
 
+### Appearance
+
+`despegate appearance light`, `dark` or `system` (follow Windows). The window and the lock screen both follow it. The typeface (Gabarito, SIL Open Font License) ships inside the executables, so nothing is fetched from the network.
+
 ### Language
 
 `despegate language` lists the languages; `despegate language es` chooses one and `despegate language auto` goes back to following Windows.
@@ -96,14 +106,15 @@ As long as your account is an administrator, you can undo despegate from an elev
 
 ## How it is built
 
-Two executables share one library:
+Three executables share one library:
 
 - `despegate.exe` — the CLI. It sends each request to the daemon over a named pipe; the daemon decides whether to accept it.
+- `despegate-ui.exe` — the settings window: a native window with an embedded page (`ui/index.html`, shown through WebView2). It reads the configuration directly and makes every change by running the CLI.
 - `despegated.exe` — the daemon and its agent.
   - The **daemon** is the service. It holds the configuration and the usage counters, decides what is blocked, and closes programs. It lives in the services session, where it can show nothing and sees no input.
-  - The **agent** is started by the daemon inside your session. It draws the lock screen and the banner, and reports idle time and the program in front. If it dies the daemon starts another; if it keeps dying during a lock, the daemon sends the session to the Windows sign-in screen.
+  - The **agent** is started by the daemon inside your session. It draws the lock screen and the banner, and reports idle time and the program in front. If it dies the daemon starts another; if it keeps dying during a lock, the daemon sends the session to the Windows sign-in screen. The lock screen is a page (`ui/lock.html`) shown through WebView2 so it can play your photos and videos; without WebView2 it is drawn by hand, words only.
 
-State lives in `C:\ProgramData\despegate`: `config.toml`, `state.toml` (usage counters, so that restarting the daemon resets nothing) and `despegate.log`. Everyone can read it; only the daemon writes it.
+State lives in `C:\ProgramData\despegate`: `config.toml`, `state.toml` (usage counters, so that restarting the daemon resets nothing), `media\` (copies of the photos and videos; the daemon reads the originals as the user who asked, never with its own rights) and `despegate.log`. Everyone can read it; only the daemon writes it.
 
 ## Limits
 

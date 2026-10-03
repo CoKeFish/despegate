@@ -1,0 +1,984 @@
+<!doctype html>
+<html lang="__LANG__"__THEME__>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>despegate</title>
+<style>__FONT__</style>
+<style>
+  /* Día y noche: the sticker's yellow marks whatever is happening now, a night
+     indigo is the ink and the blocked time. Gabarito throughout.
+     Light is the base; dark redefines the same tokens. */
+  :root {
+    --sol: #f5b800;
+    --ink: #1d1b45;
+    --bg: #f1f1f6;
+    --fg: #1d1b45;
+    --muted: #5d5b80;
+    --line: #d9d9e6;
+    --edge: #b4b4cc;
+    --field: #ffffff;
+    --side: #e7e7f0;
+    --tint: #e4e4ef;
+    --strong: #1d1b45;
+    --strong-hover: #2f2c6b;
+    --on-strong: #f5b800;
+    --active-bg: #1d1b45;
+    --active-fg: #f5b800;
+    --note: #fdf0bd;
+    --ring: rgba(245, 184, 0, 0.55);
+    --ok: #17704a;
+    --bad: #bf3a2b;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    color-scheme: light;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #141330; --fg: #eeedfb; --muted: #a6a4cb; --line: #2c2a5c; --edge: #4a4884; --field: #1c1b42; --side: #0f0e28; --tint: #252356;
+      --strong: #f5b800; --strong-hover: #ffcb2e; --on-strong: #1d1b45; --active-bg: #eeedfb; --active-fg: #1d1b45;
+      --note: #1c1b42; --ring: rgba(245, 184, 0, 0.35); --ok: #7fdcae; --bad: #ff9f8c;
+      color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #141330; --fg: #eeedfb; --muted: #a6a4cb; --line: #2c2a5c; --edge: #4a4884; --field: #1c1b42; --side: #0f0e28; --tint: #252356;
+    --strong: #f5b800; --strong-hover: #ffcb2e; --on-strong: #1d1b45; --active-bg: #eeedfb; --active-fg: #1d1b45;
+    --note: #1c1b42; --ring: rgba(245, 184, 0, 0.35); --ok: #7fdcae; --bad: #ff9f8c;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; }
+  html { background: var(--side); color: var(--fg); font: 16px/1.5 Gabarito, "Segoe UI", system-ui, sans-serif; height: 100%; }
+  body { margin: 0; height: 100%; display: grid; grid-template-rows: auto 1fr; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+  ::selection { background: var(--sol); color: var(--ink); }
+
+  /* Navigation: a pane on the left when there is room, tabs across the top otherwise.
+     It shares its tone with the title bar; the page is a sheet laid on both. */
+  .side { display: flex; align-items: center; gap: 14px; padding: 6px 16px 10px; overflow-x: auto; }
+  .brand { display: flex; align-items: center; gap: 10px; flex: none; font-size: 21px; font-weight: 800; letter-spacing: -0.03em; line-height: 1; }
+  .brand svg { width: 26px; height: 26px; fill: var(--sol); flex: none; }
+  .brand span { display: none; }
+  #nav { display: flex; gap: 2px; }
+  #nav a { display: flex; align-items: center; color: var(--muted); text-decoration: none; padding: 6px 12px; white-space: nowrap; border-radius: 9px; font-weight: 600; }
+  #nav a.current { color: var(--ink); background: var(--sol); }
+  /* The shortcut for each page, shown while Ctrl is held. */
+  #nav .key { display: none; }
+  main { overflow-y: auto; scrollbar-width: thin; scrollbar-color: var(--edge) transparent; container: main / inline-size; background: var(--bg); border-radius: 16px 16px 0 0; }
+  .page { display: none; max-width: 1320px; margin: 0 auto; padding: 28px 24px 56px; }
+  .page.current { display: block; }
+  @media (min-width: 860px) {
+    body { grid-template-rows: 1fr; grid-template-columns: 216px 1fr; }
+    .side { flex-direction: column; align-items: stretch; gap: 30px; padding: 26px 16px 24px 20px; overflow: visible; }
+    main { border-radius: 16px 0 0 0; }
+    .brand { padding-left: 10px; }
+    .brand span { display: inline; }
+    #nav { flex-direction: column; }
+    #nav a { padding: 8px 12px; }
+    #nav .key { display: block; margin-left: auto; font-size: 12px; font-weight: 600; line-height: 1; padding: 3px 6px; border: 1px solid currentColor; border-radius: 6px; visibility: hidden; }
+    .keys #nav .key { visibility: visible; }
+    .page { padding: 44px 40px 64px; }
+  }
+  @media (min-width: 1400px) {
+    body { grid-template-columns: 252px 1fr; }
+    .side { gap: 36px; padding: 30px 20px 28px 26px; }
+    .brand { font-size: 24px; }
+    .brand svg { width: 30px; height: 30px; }
+    #nav { gap: 4px; }
+    #nav a { font-size: 17px; padding: 9px 14px; }
+  }
+
+  h1 { font-size: 34px; line-height: 1.05; letter-spacing: -0.025em; margin: 0 0 22px; font-weight: 800; }
+  h2 { font-size: 22px; line-height: 1.15; letter-spacing: -0.015em; margin: 44px 0 14px; font-weight: 800; }
+  .lead { margin: -10px 0 24px; color: var(--muted); font-size: 17px; max-width: 60ch; }
+  a { color: inherit; text-underline-offset: 3px; }
+
+  /* What is happening now, on the sticker from the logo: its corner has let go. */
+  .hero { --cut: 52px; --hero-bg: var(--sol); --hero-fg: var(--ink);
+    position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: center; gap: 8px;
+    min-height: clamp(136px, 21vh, 230px); margin: 0 0 30px; padding: 26px calc(var(--cut) + 22px) 26px 28px; color: var(--hero-fg); }
+  .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 22px; background: var(--hero-bg); transition: background-color 200ms ease;
+    -webkit-mask: linear-gradient(225deg, transparent calc(var(--cut) * 0.7071), #000 calc(var(--cut) * 0.7071 + 0.7px));
+    mask: linear-gradient(225deg, transparent calc(var(--cut) * 0.7071), #000 calc(var(--cut) * 0.7071 + 0.7px)); }
+  .hero .flap { position: absolute; top: 0; right: 0; width: var(--cut); height: var(--cut); fill: var(--hero-bg); transition: fill 200ms ease;
+    transform-origin: 0 100%; transform: translate(calc(var(--cut) * 0.256), calc(var(--cut) * -0.256)) rotate(-12deg);
+    animation: peel 560ms var(--ease-out) 160ms backwards; }
+  @keyframes peel { from { transform: translate(0, 0) rotate(0deg); } }
+  .hero h1 { font-size: clamp(28px, 4.6vw, 42px); line-height: 1.04; letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
+  .hero p { margin: 0; font-size: 17px; font-weight: 500; white-space: pre-line; }
+  .hero[data-kind="locked"], .hero[data-kind="blocking"], .hero[data-kind="break"] { --hero-bg: var(--active-bg); --hero-fg: var(--active-fg); }
+  .hero[data-kind="paused"] { --hero-bg: var(--note); --hero-fg: var(--fg); }
+  /* Not running: the sticker is gone and only its place is left. */
+  .hero[data-kind="stopped"] { --hero-fg: var(--fg); }
+  .hero[data-kind="stopped"]::before { background: transparent; border: 2px dashed var(--edge); -webkit-mask: none; mask: none; }
+  .hero[data-kind="stopped"] .flap { display: none; }
+  .starts { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 10px; }
+  .starts[hidden] { display: none; }
+  .hero a.button { background: var(--ink); border-color: var(--ink); color: var(--sol); }
+
+  /* The week: one row per day, hours across, rules painted on it. */
+  .week { display: grid; gap: clamp(7px, 1.2vh, 13px); margin: 0 0 6px; }
+  .week .row { display: grid; grid-template-columns: 44px 1fr; align-items: center; }
+  .week .day { font-size: 14px; line-height: 1; color: var(--muted); font-weight: 600; }
+  .week .row.today .day { color: var(--fg); font-weight: 800; }
+  .week .track { position: relative; height: clamp(20px, 3.2vh, 34px); border-radius: 7px; box-shadow: inset 0 0 0 1px var(--line);
+    background: var(--field) repeating-linear-gradient(to right, transparent 0 calc(25% - 1px), var(--line) calc(25% - 1px) 25%); }
+  .week .block { position: absolute; top: 0; bottom: 0; min-width: 3px; border-radius: 6px; background: var(--fg); }
+  .week .block.apps { background: repeating-linear-gradient(135deg, var(--fg) 0 3px, transparent 3px 7px); box-shadow: inset 0 0 0 1.5px var(--fg); }
+  .week .block.oneoff { background: var(--sol); box-shadow: inset 0 0 0 2px var(--fg); }
+  .week .block.oneoff.apps { background: repeating-linear-gradient(135deg, var(--fg) 0 3px, var(--sol) 3px 7px); }
+  .week .now { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--fg); box-shadow: 0 0 0 1.5px var(--bg); }
+  .week .now::before { content: ""; position: absolute; top: -7px; left: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--sol); border: 2px solid var(--fg); box-shadow: 0 0 0 1.5px var(--bg); }
+  .axis { position: relative; height: 18px; margin-left: 44px; }
+  .axis span { position: absolute; transform: translateX(-50%); font-size: 13px; color: var(--muted); }
+  .axis span:first-child { transform: none; }
+  .axis span:last-child { transform: translateX(-100%); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 20px; margin: 10px 0 0 44px; color: var(--muted); font-size: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .legend span::before { content: ""; width: 18px; height: 11px; border-radius: 4px; }
+  .legend .lock::before { background: var(--fg); }
+  .legend .apps::before { background: repeating-linear-gradient(135deg, var(--fg) 0 3px, transparent 3px 7px); box-shadow: inset 0 0 0 1.5px var(--fg); }
+  .legend .now::before { width: 10px; height: 10px; border-radius: 50%; background: var(--sol); border: 2px solid var(--fg); }
+
+  /* Settings rows: what it is on the left, the control on the right. */
+  .setting { display: grid; grid-template-columns: 1fr auto; gap: 4px 24px; align-items: center; padding: 15px 0; border-top: 1px solid var(--line); }
+  .setting:last-of-type { border-bottom: 1px solid var(--line); }
+  #settings-rows .setting:last-of-type { border-bottom: 0; }
+  .setting .title { font-weight: 700; }
+  .setting .desc { color: var(--muted); font-size: 15px; }
+  .setting .control { display: flex; align-items: center; gap: 8px; justify-self: end; }
+  .setting .note { grid-column: 1 / -1; font-size: 15px; color: var(--muted); min-height: 0; }
+  .setting .note:empty { display: none; }
+  .setting.off .text { opacity: 0.5; }
+  @media (max-width: 480px) {
+    .setting { grid-template-columns: 1fr; }
+    .setting .control { justify-self: start; }
+  }
+
+  label, .label { display: block; color: var(--muted); font-size: 14px; margin-bottom: 5px; font-weight: 600; }
+  input, textarea, select {
+    font: inherit; color: var(--fg); background: var(--field);
+    border: 1.5px solid var(--line); border-radius: 10px; padding: 7px 12px; width: 100%;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--strong); box-shadow: 0 0 0 3px var(--ring); }
+  :is(button, a, summary, [tabindex]):focus-visible { outline: 3px solid var(--strong); outline-offset: 2px; }
+  input:disabled, select:disabled { opacity: 0.5; }
+  textarea { min-height: 110px; resize: vertical; display: block; }
+  input[type="number"] { width: 88px; text-align: right; }
+  .unit { color: var(--muted); font-size: 15px; }
+  select { appearance: none; padding-right: 34px; width: auto; min-width: 170px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+
+  /* A switch, drawn over a checkbox. */
+  .switch { position: relative; display: inline-block; width: 46px; height: 26px; }
+  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; cursor: pointer; z-index: 1; }
+  .switch span { position: absolute; inset: 0; background: var(--edge); border-radius: 13px; transition: background-color 160ms ease; }
+  .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 20px; height: 20px; border-radius: 50%; background: var(--field); transition: transform 160ms var(--ease-out), background-color 160ms ease; }
+  .switch input:checked + span { background: var(--strong); }
+  .switch input:checked + span::after { transform: translateX(20px); background: var(--on-strong); }
+  .switch input:active + span::after { transform: scale(0.9); }
+  .switch input:checked:active + span::after { transform: translateX(20px) scale(0.9); }
+  .switch input:focus-visible + span { outline: 3px solid var(--strong); outline-offset: 2px; }
+  .check { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-size: 16px; margin: 0; cursor: pointer; }
+  .check .switch { flex: none; }
+  .pill { display: inline-block; font-size: 13px; font-weight: 700; color: var(--ink); background: var(--sol); border-radius: 999px; padding: 1px 10px; vertical-align: 2px; }
+
+  a.button { display: inline-block; text-decoration: none; }
+  button, a.button { font: inherit; font-weight: 700; color: var(--fg); background: var(--field); border: 1.5px solid var(--line); border-radius: 10px; padding: 7px 18px; cursor: pointer;
+    transition: transform 140ms var(--ease-out), background-color 150ms ease, border-color 150ms ease, color 150ms ease; }
+  button:active:not(:disabled), a.button:active { transform: scale(0.97); }
+  button.primary { background: var(--strong); border-color: var(--strong); color: var(--on-strong); }
+  button.small { padding: 3px 12px; min-height: 30px; font-size: 14px; }
+  button.quiet { border-color: transparent; background: transparent; color: var(--muted); padding: 5px 10px; min-height: 32px; font-weight: 600; }
+  button:disabled { opacity: 0.5; cursor: default; }
+  @media (hover: hover) and (pointer: fine) {
+    #nav a:not(.current):hover { color: var(--fg); background: var(--tint); }
+    button:hover:not(:disabled), summary:hover { border-color: var(--edge); background: var(--tint); }
+    button.primary:hover:not(:disabled) { background: var(--strong-hover); border-color: var(--strong-hover); }
+    button.quiet:hover:not(:disabled) { color: var(--fg); border-color: transparent; }
+    .gallery figcaption button.quiet:hover:not(:disabled) { color: #fff; background: rgba(255, 255, 255, 0.2); }
+    details.about summary:hover { background: none; color: var(--fg); }
+    .hero a.button:hover { background: var(--strong-hover); border-color: var(--strong-hover); }
+    input:hover:not(:focus):not(:disabled), textarea:hover:not(:focus), select:hover:not(:focus) { border-color: var(--edge); }
+  }
+
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px 18px; margin-bottom: 16px; }
+  .fields .wide { grid-column: 1 / -1; }
+  .fields .short { max-width: 150px; }
+  .fields.pair { grid-template-columns: auto 1fr; }
+  @media (max-width: 620px) { .fields.pair { grid-template-columns: 1fr; } }
+  .inline { display: flex; align-items: center; gap: 10px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 12px 18px; align-items: center; margin-top: 6px; }
+  .chips { display: flex; flex-wrap: wrap; gap: 6px; }
+  .chips button { border-radius: 999px; padding: 4px 14px; min-height: 36px; color: var(--muted); font-weight: 600; background: transparent; border-color: var(--edge); }
+  /* The days a rule takes are painted like the hours it takes in the week. */
+  .chips button.on { color: var(--bg); background: var(--fg); border-color: var(--fg); font-weight: 700; }
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; }
+  .presets button { padding: 3px 11px; min-height: 32px; font-size: 14px; font-weight: 600; color: var(--muted); background: transparent; border-radius: 999px; }
+  .presets button.on { color: var(--fg); border-color: var(--fg); }
+  #day-presets { margin-top: 8px; }
+
+  .list { margin: 0; padding: 0; list-style: none; }
+  .list li { display: flex; align-items: baseline; gap: 4px 16px; padding: 13px 0; border-top: 1px solid var(--line); flex-wrap: wrap; }
+  .list li:last-child { border-bottom: 1px solid var(--line); }
+  .list .name { font-weight: 700; white-space: nowrap; }
+  .list .desc { color: var(--muted); flex: 1 1 200px; white-space: pre-wrap; }
+  .confirm { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 15px; transition: opacity 160ms ease; }
+  .confirm[hidden] { display: none; }
+  @starting-style { .confirm { opacity: 0; } }
+  .list li.empty { color: var(--muted); }
+
+  /* What opens a form: a button with a plus that turns into a cross. */
+  details { margin-top: 10px; }
+  summary { display: inline-flex; align-items: center; gap: 9px; cursor: pointer; font-weight: 700; list-style: none; user-select: none;
+    padding: 7px 16px 7px 13px; border: 1.5px solid var(--line); border-radius: 10px; background: var(--field);
+    transition: background-color 150ms ease, border-color 150ms ease; }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: ""; width: 12px; height: 12px; flex: none; transition: transform 200ms var(--ease-out);
+    background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat, linear-gradient(currentColor, currentColor) center / 2px 100% no-repeat; }
+  details[open] > summary::before { transform: rotate(45deg); }
+  details > div { margin-top: 12px; padding: 20px; background: var(--field); border: 1.5px solid var(--line); border-radius: 16px; }
+  details form .feedback:empty { display: none; }
+  .tool { margin-top: 36px; padding: 22px 22px 16px; background: var(--field); border: 1.5px solid var(--line); border-radius: 18px; }
+  .tool h2 { margin: 0 0 16px; }
+  .tool .feedback:empty { display: none; }
+  :is(.tool, details > div) :is(input, textarea, select) { background-color: var(--bg); }
+  details.about { margin-top: 44px; color: var(--muted); font-size: 15px; }
+  details.about summary { padding: 4px 0; border: 0; background: none; font-weight: 600; }
+  details.about > div { margin: 0; padding: 4px 0 0 21px; border: 0; background: none; }
+
+  .feedback { margin: 10px 0 0; color: var(--muted); white-space: pre-wrap; min-height: 1.5em; font-size: 15px; }
+  .preview { color: var(--muted); margin: 0 0 12px; font-size: 15px; min-height: 1.5em; }
+  .preview.warn { color: var(--bad); }
+  .feedback.error, .note.error { color: var(--bad); }
+  .feedback.ok, .note.ok { color: var(--ok); }
+  pre { font: 14px/1.5 Consolas, monospace; color: var(--muted); white-space: pre-wrap; margin: 0; }
+  .about { color: var(--muted); font-size: 15px; margin-top: 40px; }
+  p.about { display: flex; flex-wrap: wrap; gap: 4px 20px; }
+
+  /* The reasons are a note to oneself, and look like one. */
+  #reasons-text { min-height: 160px; padding: 18px 20px; font-size: 18px; font-weight: 500; background: var(--note); border-color: transparent; border-radius: 14px; }
+  #reasons-text:focus { border-color: var(--strong); }
+  #reasons-form .actions { margin-top: 14px; }
+
+  .gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; margin: 24px 0 12px; }
+  .gallery:empty { display: none; }
+  .gallery figure { margin: 0; position: relative; aspect-ratio: 4 / 3; background: var(--field); border-radius: 12px; overflow: hidden; }
+  .gallery img, .gallery video { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .gallery figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 4px 4px 10px; background: linear-gradient(to top, rgba(20, 19, 48, 0.82), rgba(20, 19, 48, 0)); color: #fff; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .gallery figcaption span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gallery figcaption button { color: #fff; padding: 2px 6px; font-size: 13px; }
+  .gallery figcaption button.small { color: var(--ink); background: #fff; border-color: #fff; min-height: 24px; padding: 0 8px; }
+  .gallery figcaption button.small.primary { background: var(--sol); border-color: var(--sol); }
+  .gallery .confirm { color: #fff; font-size: 13px; gap: 4px; }
+  .drop { border: 2px dashed var(--edge); border-radius: 16px; padding: 22px; text-align: center; color: var(--muted); margin-top: 12px; transition: background-color 150ms ease, border-color 150ms ease; }
+  .drop div { margin-top: 6px; font-size: 15px; }
+  .drop.over { border-color: var(--strong); color: var(--fg); background: var(--note); }
+
+  @container main (min-width: 1000px) {
+    .page { padding: clamp(44px, 6vh, 72px) 56px 64px; font-size: 17px; }
+    h1 { font-size: 40px; margin-bottom: 28px; }
+    .lead { font-size: 19px; }
+    label, .label, .week .day, .legend { font-size: 15px; }
+    .axis span { font-size: 14px; }
+    .setting .desc, .setting .note, .feedback, .preview, .unit { font-size: 16px; }
+    .page.current:is(#home, #rules, #allowances, #reasons, #settings) { display: grid; column-gap: 56px; align-items: start; }
+    #home { grid-template-columns: minmax(0, 1fr) 380px; }
+    #home .hero { --cut: 64px; grid-column: 1 / -1; margin-bottom: 40px; padding: 34px calc(var(--cut) + 30px) 34px 40px; }
+    #home .hero h1 { font-size: 56px; }
+    #home .hero p { font-size: 19px; }
+    #home .tool { margin-top: 0; }
+    #home .fields.pair { grid-template-columns: 1fr; }
+    #home details.about { grid-column: 1 / -1; }
+    :is(#rules, #allowances) { grid-template-columns: minmax(0, 1fr) 460px; grid-template-rows: auto auto 1fr; }
+    #rule-form .fields > :first-child { grid-column: 1 / -1; }
+    #rule-days { display: grid; grid-template-columns: repeat(7, 1fr); }
+    #rule-days button { padding: 4px 0; }
+    :is(#rules, #allowances, #reasons, #settings) > h1, #reasons > .lead { grid-column: 1 / -1; }
+    :is(#rules, #allowances) > :is(.list, .feedback) { grid-column: 1; }
+    :is(#rules, #allowances) > details { grid-column: 2; grid-row: 2 / span 2; margin-top: 0; }
+    #reasons { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); }
+    #reasons .gallery { margin-top: 0; }
+    #reasons-text { min-height: 240px; }
+    #settings { grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr); grid-template-rows: auto auto auto 1fr; }
+    #settings-rows { grid-column: 1; grid-row: 2 / span 3; }
+    #settings > :is(.setting, .about) { grid-column: 2; }
+    #settings-rows .setting:last-of-type { border-bottom: 1px solid var(--line); }
+    #breaks > .setting { max-width: 760px; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero .flap { animation: none; }
+    .switch span::after, summary::before, button, a.button { transition: none; }
+  }
+  @media (forced-colors: active) {
+    .chips button.on, #nav a.current, .presets button.on { outline: 3px solid Highlight; outline-offset: -3px; }
+    .week .block, .hero::before, .hero .flap { forced-color-adjust: none; }
+    .switch input:checked + span { outline: 2px solid Highlight; }
+  }
+</style>
+</head>
+<body>
+<div class="side">
+  <div class="brand">
+    <svg viewBox="0 0 256 256" aria-hidden="true"><path d="M26 40H122a16 16 0 0 1 11 5L216 126V230a26 26 0 0 1-26 26H26A26 26 0 0 1 0 230V66A26 26 0 0 1 26 40Z"/><path transform="translate(152 18) rotate(-12 0 86)" d="M8 0H78a8 8 0 0 1 8 8V78a8 8 0 0 1-8 8L0 8A8 8 0 0 1 8 0Z"/></svg>
+    <span>despegate</span>
+  </div>
+  <nav id="nav"></nav>
+</div>
+<main>
+  <section class="page" id="home">
+    <div class="hero" id="hero" data-kind="free">
+      <svg class="flap" viewBox="0 0 86 86" aria-hidden="true"><path d="M8 0H78a8 8 0 0 1 8 8V78a8 8 0 0 1-8 8L0 8A8 8 0 0 1 8 0Z"/></svg>
+      <h1 id="hero-title">&nbsp;</h1>
+      <p id="hero-details"></p>
+      <div class="starts" id="starts" hidden>
+        <a class="button" href="#reasons" id="start-reasons" data-t="ui.hero.start_reasons"></a>
+        <a class="button" href="#rules" data-t="ui.hero.start_rule"></a>
+      </div>
+    </div>
+    <div class="when">
+      <div class="week" id="week"></div>
+      <div class="axis" id="axis"></div>
+      <div class="legend">
+        <span class="lock" data-t="ui.week.lock"></span>
+        <span class="apps" data-t="ui.week.apps"></span>
+        <span class="now" data-t="ui.week.now"></span>
+      </div>
+    </div>
+
+    <div class="tool">
+    <h2 data-t="ui.now.heading"></h2>
+    <form id="now-form">
+      <div class="fields pair">
+        <div><label data-t="ui.minutes_long" for="now-minutes"></label>
+          <div class="inline"><input id="now-minutes" name="minutes" type="number" min="1" max="1440" value="45" required>
+            <div class="presets" id="minute-presets"></div></div></div>
+        <div><label data-t="ui.apps" for="now-apps"></label><input id="now-apps" name="apps"></div>
+      </div>
+      <div class="actions">
+        <label class="check"><span class="switch"><input name="lock" type="checkbox" checked><span></span></span><span data-t="ui.lock"></span></label>
+        <button type="submit" class="primary" data-t="ui.now.start"></button>
+        <span class="confirm" hidden></span>
+      </div>
+      <p class="feedback" aria-live="polite"></p>
+    </form>
+    </div>
+
+    <details class="about">
+      <summary data-t="ui.about.status"></summary>
+      <div><pre id="status-text"></pre></div>
+    </details>
+  </section>
+
+  <section class="page" id="rules">
+    <h1 data-t="ui.rules.heading"></h1>
+    <ul class="list" id="rules-list"></ul>
+    <p class="feedback" id="rules-feedback" aria-live="polite"></p>
+    <details id="rule-details">
+      <summary data-t="ui.rules.new"></summary>
+      <div>
+        <form id="rule-form">
+          <div class="fields">
+            <div><label data-t="ui.rules.name" for="rule-name"></label><input id="rule-name" name="name" required></div>
+            <div class="short"><label data-t="ui.rules.from" for="rule-from"></label><input id="rule-from" name="from" type="time" required></div>
+            <div class="short"><label data-t="ui.rules.to" for="rule-to"></label><input id="rule-to" name="to" type="time" required></div>
+            <div class="wide"><div class="label" id="rule-days-label" data-t="ui.rules.days"></div><div class="chips" id="rule-days" role="group" aria-labelledby="rule-days-label"></div>
+              <div class="presets" id="day-presets"></div></div>
+            <div class="wide"><label data-t="ui.apps" for="rule-apps"></label><input id="rule-apps" name="apps"></div>
+          </div>
+          <p class="preview" id="rule-preview" aria-live="polite"></p>
+          <div class="actions">
+            <label class="check"><span class="switch"><input name="lock" type="checkbox" checked><span></span></span><span data-t="ui.lock"></span></label>
+            <button type="submit" class="primary" data-t="ui.add"></button>
+          </div>
+          <p class="feedback" aria-live="polite"></p>
+        </form>
+      </div>
+    </details>
+  </section>
+
+  <section class="page" id="breaks">
+    <h1 data-t="ui.breaks.heading"></h1>
+    <div class="setting" id="breaks-toggle-row">
+      <div class="text"><div class="title" id="breaks-toggle-title" data-t="ui.breaks.toggle"></div></div>
+      <div class="control"><label class="switch"><input type="checkbox" id="breaks-on" aria-labelledby="breaks-toggle-title"><span></span></label></div>
+      <div class="note" id="breaks-note"></div>
+    </div>
+    <div class="setting" id="breaks-every-row">
+      <div class="text"><div class="title" id="breaks-every-title" data-t="ui.breaks.every"></div></div>
+      <div class="control"><input type="number" id="breaks-every" min="5" max="480" value="50" aria-labelledby="breaks-every-title"><span class="unit" data-t="ui.minutes"></span></div>
+    </div>
+    <div class="setting" id="breaks-rest-row">
+      <div class="text"><div class="title" id="breaks-rest-title" data-t="ui.breaks.rest"></div></div>
+      <div class="control"><input type="number" id="breaks-rest" min="1" max="120" value="10" aria-labelledby="breaks-rest-title"><span class="unit" data-t="ui.minutes"></span></div>
+    </div>
+  </section>
+
+  <section class="page" id="allowances">
+    <h1 data-t="ui.allowances.heading"></h1>
+    <ul class="list" id="allowances-list"></ul>
+    <p class="feedback" id="allowances-feedback" aria-live="polite"></p>
+    <details id="allowance-details">
+      <summary data-t="ui.allowances.new"></summary>
+      <div>
+        <form id="allowance-form">
+          <div class="fields">
+            <div><label data-t="ui.allowances.app" for="allowance-app"></label><input id="allowance-app" name="app" required></div>
+            <div class="short"><label data-t="ui.allowances.minutes" for="allowance-minutes"></label><input id="allowance-minutes" name="minutes" type="number" min="1" max="1440" value="60" required></div>
+          </div>
+          <div class="actions"><button type="submit" class="primary" data-t="ui.add"></button></div>
+          <p class="feedback" aria-live="polite"></p>
+        </form>
+      </div>
+    </details>
+  </section>
+
+  <section class="page" id="reasons">
+    <h1 id="reasons-heading" data-t="ui.reasons.heading"></h1>
+    <p class="lead" data-t="ui.reasons.hint"></p>
+    <form id="reasons-form">
+      <textarea id="reasons-text" aria-labelledby="reasons-heading"></textarea>
+      <div class="actions"><button type="submit" class="primary" data-t="ui.save"></button></div>
+      <p class="feedback" aria-live="polite"></p>
+    </form>
+    <div class="shots">
+    <div class="gallery" id="gallery"></div>
+    <div class="drop" id="drop">
+      <button type="button" id="pick" data-t="ui.reasons.add"></button>
+      <div data-t="ui.reasons.drop"></div>
+    </div>
+    <p class="feedback" id="media-feedback" aria-live="polite"></p>
+    </div>
+  </section>
+
+  <section class="page" id="settings">
+    <h1 data-t="ui.settings.heading"></h1>
+    <div id="settings-rows"></div>
+    <div class="setting">
+      <div class="text"><div class="title" id="appearance-title" data-t="ui.settings.appearance"></div></div>
+      <div class="control"><select id="appearance" aria-labelledby="appearance-title">
+        <option value="system" data-t="ui.settings.appearance_system"></option>
+        <option value="light" data-t="ui.settings.appearance_light"></option>
+        <option value="dark" data-t="ui.settings.appearance_dark"></option>
+      </select></div>
+      <div class="note" id="appearance-note"></div>
+    </div>
+    <div class="setting">
+      <div class="text"><div class="title" id="language-title" data-t="ui.settings.language"></div></div>
+      <div class="control"><select id="language" aria-labelledby="language-title"></select></div>
+      <div class="note" id="language-note"></div>
+    </div>
+    <p class="about"><span data-t="ui.about.version"></span><a href="https://github.com/CoKeFish/despegate#readme" data-t="ui.about.help"></a></p>
+  </section>
+</main>
+
+<script>
+  const T = __I18N__;
+  const t = (key, vars = {}) => (T[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? `{${name}}`);
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const PAGES = ["home", "rules", "breaks", "allowances", "reasons", "settings"];
+
+  for (const el of document.querySelectorAll("[data-t]")) el.textContent = t(el.dataset.t, { version: "__VERSION__" });
+
+  // Requests to the Rust side are answered through window.__reply.
+  const pending = new Map();
+  let seq = 0;
+  function ask(message) {
+    return new Promise((resolve) => {
+      const id = ++seq;
+      pending.set(id, resolve);
+      window.ipc.postMessage(JSON.stringify({ id, ...message }));
+    });
+  }
+  window.__reply = (reply) => {
+    const resolve = pending.get(reply.id);
+    pending.delete(reply.id);
+    if (resolve) resolve(reply);
+  };
+  const cli = (...args) => ask({ kind: "cli", args });
+
+  // Success notices fade on their own; errors stay until the next action.
+  const timers = new WeakMap();
+  function show(el, text, ok) {
+    el.textContent = text;
+    el.classList.toggle("error", ok === false);
+    el.classList.toggle("ok", ok === true);
+    clearTimeout(timers.get(el));
+    if (ok === true) timers.set(el, setTimeout(() => { if (el.textContent === text) el.textContent = ""; }, 5000));
+  }
+
+  // Ctrl+1 … Ctrl+6 switch pages; holding Ctrl shows which number goes where.
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Control") document.body.classList.add("keys");
+    const n = Number(e.key);
+    if (e.ctrlKey && !e.altKey && n >= 1 && n <= PAGES.length) { e.preventDefault(); location.hash = `#${PAGES[n - 1]}`; }
+  });
+  document.addEventListener("keyup", (e) => { if (e.key === "Control") document.body.classList.remove("keys"); });
+  window.addEventListener("blur", () => document.body.classList.remove("keys"));
+
+  // Sends one CLI command for a form, shows what it answered, then redraws.
+  async function act(form, args, feedback = $(".feedback", form)) {
+    const buttons = form ? form.querySelectorAll("button") : [];
+    buttons.forEach((b) => (b.disabled = true));
+    show(feedback, t("ui.working"));
+    const reply = await cli(...args);
+    show(feedback, reply.text, reply.ok);
+    buttons.forEach((b) => (b.disabled = false));
+    await refresh();
+    return reply;
+  }
+
+  function splitApps(text) {
+    return text.split(",").map((s) => s.trim()).filter(Boolean);
+  }
+
+  // --- pages
+  const nav = $("#nav");
+  PAGES.forEach((page, i) => {
+    const a = document.createElement("a");
+    a.href = `#${page}`;
+    a.title = `Ctrl+${i + 1}`;
+    const key = document.createElement("span");
+    key.className = "key";
+    key.setAttribute("aria-hidden", "true");
+    key.textContent = i + 1;
+    a.append(t(`ui.nav.${page}`), key);
+    nav.append(a);
+  });
+  // The page comes back where it was left.
+  let remembered = null;
+  try { remembered = localStorage.getItem("page"); } catch {}
+  if (!location.hash && remembered && PAGES.includes(remembered)) location.hash = `#${remembered}`;
+  function showPage() {
+    const page = PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : PAGES[0];
+    for (const section of document.querySelectorAll(".page")) section.classList.toggle("current", section.id === page);
+    for (const a of nav.children) {
+      const current = a.getAttribute("href") === `#${page}`;
+      a.classList.toggle("current", current);
+      if (current) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    }
+    $("main").scrollTop = 0;
+    try { localStorage.setItem("page", page); } catch {}
+  }
+  window.addEventListener("hashchange", showPage);
+  showPage();
+
+  // --- the week
+  const minutes = (hhmmss) => { const [h, m] = hhmmss.split(":").map(Number); return h * 60 + m; };
+  const pct = (mins) => `${(mins / 1440) * 100}%`;
+  const axis = $("#axis");
+  for (const hour of [0, 6, 12, 18, 24]) {
+    const s = document.createElement("span");
+    s.style.left = pct(hour * 60);
+    s.textContent = hour;
+    axis.append(s);
+  }
+  function paintWeek(config) {
+    const week = $("#week");
+    week.replaceChildren();
+    const now = new Date();
+    const today = (now.getDay() + 6) % 7; // Monday first
+    const tracks = DAYS.map((day, i) => {
+      const row = document.createElement("div");
+      row.className = "row" + (i === today ? " today" : "");
+      const label = document.createElement("span");
+      label.className = "day";
+      label.textContent = t(`day.${day.toLowerCase()}`);
+      const track = document.createElement("div");
+      track.className = "track";
+      row.append(label, track);
+      week.append(row);
+      return track;
+    });
+    const paint = (dayIndex, from, to, cls, title) => {
+      if (to <= from) return;
+      const block = document.createElement("div");
+      block.className = `block ${cls}`;
+      block.style.left = pct(from);
+      block.style.width = pct(to - from);
+      block.title = title;
+      tracks[dayIndex].append(block);
+    };
+    for (const rule of config.rules) {
+      const start = minutes(rule.start), end = minutes(rule.end);
+      const cls = rule.lock ? "lock" : "apps";
+      for (const day of rule.days) {
+        const i = DAYS.indexOf(day);
+        if (end > start) paint(i, start, end, cls, rule.name);
+        else { paint(i, start, 1440, cls, rule.name); paint((i + 1) % 7, 0, end, cls, rule.name); }
+      }
+    }
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    for (const block of config.oneoffs) {
+      const until = new Date(block.until);
+      const sameDay = until.toDateString() === now.toDateString();
+      const end = sameDay ? until.getHours() * 60 + until.getMinutes() : 1440;
+      paint(today, nowMinutes, end, (block.lock ? "lock" : "apps") + " oneoff", block.name);
+    }
+    const marker = document.createElement("div");
+    marker.className = "now";
+    marker.style.left = pct(nowMinutes);
+    tracks[today].append(marker);
+  }
+
+  // --- a two-step confirmation for what cannot be undone
+  function confirmThen(button, label, run) {
+    const holder = button.parentElement.querySelector(".confirm");
+    holder.hidden = false;
+    holder.replaceChildren();
+    const q = document.createElement("span");
+    q.textContent = label;
+    const yes = document.createElement("button");
+    yes.type = "button"; yes.className = "small primary"; yes.textContent = t("ui.confirm.yes");
+    const no = document.createElement("button");
+    no.type = "button"; no.className = "small"; no.textContent = t("ui.confirm.no");
+    const done = () => { holder.hidden = true; holder.replaceChildren(); button.hidden = false; document.removeEventListener("keydown", escape); };
+    const escape = (e) => { if (e.key === "Escape") { done(); button.focus(); } };
+    yes.onclick = () => { done(); run(); };
+    no.onclick = done;
+    holder.append(q, yes, no);
+    button.hidden = true;
+    document.addEventListener("keydown", escape);
+    yes.focus();
+  }
+
+  // --- right now
+  $("#now-form").onsubmit = (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const button = $("button.primary", f);
+    confirmThen(button, t("ui.confirm.start"), () => {
+      const args = ["now", "--for", f.minutes.value];
+      if (f.lock.checked) args.push("--lock");
+      for (const app of splitApps(f.apps.value)) args.push("--app", app);
+      act(f, args);
+    });
+  };
+
+  // --- rules
+  const chips = $("#rule-days");
+  const selectedDays = new Set(DAYS);
+  const chipButtons = new Map();
+  function syncChips() {
+    for (const [day, b] of chipButtons) {
+      const on = selectedDays.has(day);
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on);
+    }
+  }
+  for (const day of DAYS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = t(`day.${day.toLowerCase()}`);
+    b.onclick = () => {
+      selectedDays.has(day) ? selectedDays.delete(day) : selectedDays.add(day);
+      syncChips();
+    };
+    chips.append(b);
+    chipButtons.set(day, b);
+  }
+  syncChips();
+  // Common choices in one click.
+  const dayPresets = [["all", DAYS], ["weekdays", DAYS.slice(0, 5)], ["weekends", DAYS.slice(5)]];
+  for (const [key, days] of dayPresets) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = t(`ui.rules.days_${key}`);
+    b.onclick = () => { selectedDays.clear(); days.forEach((d) => selectedDays.add(d)); syncChips(); previewRule(); };
+    $("#day-presets").append(b);
+  }
+  // The preset that matches what is typed stays marked.
+  const nowMinutes = $("#now-minutes");
+  const minutePresets = new Map();
+  function syncMinutePresets() {
+    for (const [minutes, b] of minutePresets) {
+      const on = Number(nowMinutes.value) === minutes;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on);
+    }
+  }
+  for (const minutes of [15, 30, 45, 60, 90]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = minutes;
+    b.onclick = () => { nowMinutes.value = minutes; syncMinutePresets(); };
+    $("#minute-presets").append(b);
+    minutePresets.set(minutes, b);
+  }
+  nowMinutes.addEventListener("input", syncMinutePresets);
+  syncMinutePresets();
+  function daysArgument() {
+    if (selectedDays.size === 7) return "all";
+    return DAYS.filter((d) => selectedDays.has(d)).map((d) => d.toLowerCase()).join(",");
+  }
+  function describeDays(days) {
+    const present = DAYS.map((d, i) => (days.includes(d) ? i : -1)).filter((i) => i >= 0);
+    if (present.length === 7) return t("ui.days.every");
+    const name = (i) => t(`day.${DAYS[i].toLowerCase()}`);
+    const consecutive = present.length >= 3 && present[present.length - 1] - present[0] + 1 === present.length;
+    return consecutive ? `${name(present[0])}–${name(present[present.length - 1])}` : present.map(name).join(", ");
+  }
+  function describeEffect(lock, apps) {
+    if (lock && apps.length) return t("ui.effect.both", { apps: apps.join(", ") });
+    if (lock) return t("ui.effect.lock");
+    return t("ui.effect.close", { apps: apps.join(", ") });
+  }
+  function describeWindow(from, to) {
+    const overnight = to && from && to <= from;
+    return t(overnight ? "ui.rules.window_overnight" : "ui.rules.window", { from, to });
+  }
+  // What the rule will do, in words, as it is being written.
+  function previewRule() {
+    const f = $("#rule-form");
+    const preview = $("#rule-preview");
+    const apps = splitApps(f.apps.value);
+    const lock = f.lock.checked;
+    if (!lock && !apps.length) { preview.textContent = t("ui.rules.need_effect"); preview.classList.add("warn"); return false; }
+    preview.classList.remove("warn");
+    if (!f.from.value || !f.to.value) { preview.textContent = ""; return true; }
+    preview.textContent = `${describeDays([...selectedDays])}, ${describeWindow(f.from.value, f.to.value)} ${describeEffect(lock, apps)}`;
+    return true;
+  }
+  for (const field of $("#rule-form").querySelectorAll("input")) { field.addEventListener("input", previewRule); field.addEventListener("change", previewRule); }
+  chips.addEventListener("click", previewRule);
+  $("#rule-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    if (!previewRule()) { f.apps.focus(); return; }
+    const args = ["rule", "add", f.name.value.trim(), "--from", f.from.value, "--to", f.to.value, "--days", daysArgument()];
+    if (f.lock.checked) args.push("--lock");
+    for (const app of splitApps(f.apps.value)) args.push("--app", app);
+    const reply = await act(f, args);
+    if (reply.ok) { f.reset(); previewRule(); $("#rule-details").open = false; show($("#rules-feedback"), reply.text, true); }
+  };
+
+  // --- breaks: applied as soon as they change
+  const breaksOn = $("#breaks-on"), every = $("#breaks-every"), rest = $("#breaks-rest");
+  async function applyBreaks() {
+    const note = $("#breaks-note");
+    const args = breaksOn.checked ? ["break", "set", "--every", every.value, "--for", rest.value] : ["break", "off"];
+    show(note, t("ui.working"));
+    const reply = await cli(...args);
+    show(note, reply.ok ? t("ui.saved") : reply.text, reply.ok);
+    await refresh();
+  }
+  breaksOn.onchange = applyBreaks;
+  every.onchange = () => breaksOn.checked && applyBreaks();
+  rest.onchange = () => breaksOn.checked && applyBreaks();
+
+  // --- allowances
+  $("#allowance-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const reply = await act(f, ["allowance", "set", f.app.value.trim(), f.minutes.value]);
+    if (reply.ok) { f.reset(); $("#allowance-details").open = false; show($("#allowances-feedback"), reply.text, true); }
+  };
+
+  // --- reasons
+  let savedReasons = "";
+  $("#reasons-text").addEventListener("input", () => {
+    const feedback = $(".feedback", $("#reasons-form"));
+    const dirty = $("#reasons-text").value !== savedReasons;
+    show(feedback, dirty ? t("ui.reasons.unsaved") : "", undefined);
+  });
+  $("#reasons-form").onsubmit = (e) => {
+    e.preventDefault();
+    act(e.target, ["reasons", "set", $("#reasons-text").value]);
+  };
+
+  // --- photos and videos
+  async function addMedia(paths) {
+    const feedback = $("#media-feedback");
+    const lines = [];
+    for (const path of paths) {
+      show(feedback, t("ui.working"));
+      const reply = await cli("reasons", "add", path);
+      lines.push(reply.text);
+      if (!reply.ok) feedback.classList.add("error");
+    }
+    show(feedback, lines.join("\n"), !feedback.classList.contains("error"));
+    await refresh();
+  }
+  $("#pick").onclick = async () => {
+    const reply = await ask({ kind: "pick" });
+    if (reply.paths && reply.paths.length) await addMedia(reply.paths);
+  };
+  window.__dropped = (paths) => { location.hash = "#reasons"; addMedia(paths); };
+  window.__dragging = (over) => $("#drop").classList.toggle("over", over);
+
+  function renderGallery(items) {
+    const gallery = $("#gallery");
+    gallery.replaceChildren();
+    for (const item of items) {
+      const figure = document.createElement("figure");
+      const el = document.createElement(item.kind === "video" ? "video" : "img");
+      el.src = item.url;
+      if (item.kind === "video") { el.muted = true; el.preload = "metadata"; }
+      const caption = document.createElement("figcaption");
+      const name = document.createElement("span");
+      name.textContent = item.name;
+      name.title = item.name;
+      const remove = document.createElement("button");
+      remove.type = "button"; remove.className = "quiet"; remove.textContent = t("ui.remove");
+      const holder = document.createElement("span");
+      holder.className = "confirm"; holder.hidden = true;
+      const wrap = document.createElement("span");
+      wrap.append(remove, holder);
+      remove.onclick = () => confirmThen(remove, t("ui.confirm.remove"),
+        () => act(null, ["reasons", "remove", item.name], $("#media-feedback")));
+      caption.append(name, wrap);
+      figure.append(el, caption);
+      gallery.append(figure);
+    }
+  }
+
+  // --- settings rows, applied as soon as they change
+  const SETTINGS = [
+    { key: "lead-minutes", field: "lead_minutes", min: 0, max: 1440 },
+    { key: "warn-minutes", field: "warn_minutes", min: 0, max: 60 },
+    { key: "emergency-chars", field: "emergency_chars", min: 0, max: 2000, unit: "ui.characters" },
+    { key: "emergency-minutes", field: "emergency_minutes", min: 1, max: 60 },
+  ];
+  let current = {};
+  const rows = $("#settings-rows");
+  for (const s of SETTINGS) {
+    const row = document.createElement("div");
+    row.className = "setting";
+    row.innerHTML = `<div class="text"><div class="title"></div><div class="desc"></div></div>
+      <div class="control"><input type="number" min="${s.min}" max="${s.max}"><span class="unit"></span></div><div class="note"></div>`;
+    $(".title", row).textContent = t(`ui.settings.${s.field}`);
+    if (T[`ui.settings.${s.field}_desc`]) $(".desc", row).textContent = T[`ui.settings.${s.field}_desc`];
+    else $(".desc", row).remove();
+    $(".unit", row).textContent = t(s.unit ?? "ui.minutes");
+    const input = $("input", row);
+    s.input = input;
+    input.onchange = async () => {
+      const note = $(".note", row);
+      if (Number(input.value) === current[s.field]) return;
+      show(note, t("ui.working"));
+      const reply = await cli("set", s.key, input.value);
+      show(note, reply.ok ? t("ui.saved") : reply.text, reply.ok);
+      if (!reply.ok) input.value = current[s.field];
+      await refresh();
+    };
+    rows.append(row);
+  }
+  // The title bar is painted by the window, which has to be told which theme is showing.
+  const systemDark = matchMedia("(prefers-color-scheme: dark)");
+  function tellTheme() {
+    const chosen = document.documentElement.dataset.theme;
+    window.ipc.postMessage(JSON.stringify({ kind: "theme", dark: chosen ? chosen === "dark" : systemDark.matches }));
+  }
+  systemDark.addEventListener("change", tellTheme);
+  tellTheme();
+  $("#appearance").onchange = async (e) => {
+    const mode = e.target.value;
+    // Shown at once; saved through the CLI like everything else.
+    if (mode === "system") delete document.documentElement.dataset.theme;
+    else document.documentElement.dataset.theme = mode;
+    tellTheme();
+    const reply = await cli("appearance", mode);
+    show($("#appearance-note"), reply.ok ? t("ui.saved") : reply.text, reply.ok);
+  };
+  $("#language").onchange = async (e) => {
+    const reply = await cli("language", e.target.value);
+    show($("#language-note"), reply.text, reply.ok);
+    // The texts on this page change with the language: reload it.
+    if (reply.ok) location.reload();
+  };
+
+  // --- drawing
+  function listItem(list, name, active, desc, onRemove) {
+    const li = document.createElement("li");
+    const title = document.createElement("span");
+    title.className = "name";
+    title.textContent = name;
+    if (active) {
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      pill.textContent = t("ui.rules.active");
+      title.append(" ", pill);
+    }
+    const text = document.createElement("span");
+    text.className = "desc";
+    text.textContent = desc;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "quiet";
+    remove.textContent = t("ui.remove");
+    const holder = document.createElement("span");
+    holder.className = "confirm";
+    holder.hidden = true;
+    const wrap = document.createElement("span");
+    wrap.append(remove, holder);
+    remove.onclick = () => confirmThen(remove, t("ui.confirm.remove"), onRemove);
+    li.append(title, text, wrap);
+    list.append(li);
+  }
+
+  function render(state) {
+    const c = state.config;
+    $("#hero").dataset.kind = state.headline.kind;
+    $("#hero-title").textContent = state.headline.title;
+    $("#hero-details").textContent = state.headline.details.join("\n");
+    paintWeek(c);
+    $("#status-text").textContent = state.status || t("ui.about.unavailable");
+
+    const rules = $("#rules-list");
+    rules.replaceChildren();
+    if (!c.rules.length) rules.innerHTML = `<li class="empty">${t("ui.rules.empty")}</li>`;
+    for (const rule of c.rules) {
+      const desc = `${describeDays(rule.days)}, ${describeWindow(rule.start.slice(0, 5), rule.end.slice(0, 5))} ${describeEffect(rule.lock, rule.apps)}`;
+      listItem(rules, rule.name, state.active.includes(rule.name), desc,
+        () => act(null, ["rule", "remove", rule.name], $("#rules-feedback")));
+    }
+    $("#rule-details").open = $("#rule-details").open || !c.rules.length;
+
+    const b = c.breaks;
+    if (document.activeElement !== breaksOn) breaksOn.checked = !!b;
+    if (b && document.activeElement !== every) every.value = b.work_minutes;
+    if (b && document.activeElement !== rest) rest.value = b.break_minutes;
+    for (const id of ["breaks-every-row", "breaks-rest-row"]) {
+      document.getElementById(id).classList.toggle("off", !b);
+      $("input", document.getElementById(id)).disabled = !b;
+    }
+
+    const allowances = $("#allowances-list");
+    allowances.replaceChildren();
+    if (!c.allowances.length) allowances.innerHTML = `<li class="empty">${t("ui.allowances.empty")}</li>`;
+    for (const a of c.allowances) {
+      const desc = t("ui.allowances.item", { minutes: a.minutes, left: state.allowance_left[a.app] ?? "" });
+      listItem(allowances, a.app, false, desc, () => act(null, ["allowance", "remove", a.app], $("#allowances-feedback")));
+    }
+    $("#allowance-details").open = $("#allowance-details").open || !c.allowances.length;
+
+    savedReasons = c.reasons;
+    if (document.activeElement !== $("#reasons-text")) $("#reasons-text").value = c.reasons;
+    renderGallery(state.media);
+    // Nothing set up yet: point at the first two things to do.
+    const fresh = !c.rules.length && !c.breaks && !c.allowances.length && !c.oneoffs.length;
+    $("#starts").hidden = !fresh;
+    $("#start-reasons").hidden = !!c.reasons;
+
+    current = c;
+    for (const s of SETTINGS) if (document.activeElement !== s.input) s.input.value = c[s.field];
+
+    if (document.activeElement !== $("#appearance")) $("#appearance").value = state.appearance ?? "system";
+    const select = $("#language");
+    select.replaceChildren();
+    select.append(new Option(t("ui.settings.auto"), "auto"));
+    for (const l of state.languages) select.append(new Option(l.name, l.code));
+    select.value = c.language ?? "auto";
+  }
+
+  async function refresh() {
+    const reply = await ask({ kind: "state" });
+    if (reply.state) render(reply.state);
+  }
+  refresh();
+  setInterval(refresh, 15000);
+</script>
+</body>
+</html>

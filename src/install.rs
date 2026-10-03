@@ -36,6 +36,7 @@ use crate::i18n::Lang;
 use crate::paths::Paths;
 use crate::session::DAEMON_EXE;
 use crate::store::Store;
+use crate::ui::UI_EXE;
 use crate::winsvc::SERVICE_NAME;
 use crate::{tr, wide};
 
@@ -64,7 +65,7 @@ pub fn install(paths: &Paths, lang: Lang) -> Result<(), String> {
         .parent()
         .ok_or_else(|| tr!(lang, "install.missing_exe", exe = CLI_EXE))?;
     let target = install_dir();
-    for exe in [CLI_EXE, DAEMON_EXE] {
+    for exe in [CLI_EXE, DAEMON_EXE, UI_EXE] {
         if !source.join(exe).exists() {
             return Err(tr!(lang, "install.missing_exe", exe = exe));
         }
@@ -75,7 +76,7 @@ pub fn install(paths: &Paths, lang: Lang) -> Result<(), String> {
     if source != target {
         std::fs::create_dir_all(&target)
             .map_err(|e| tr!(lang, "install.failed", what = target.display(), error = e))?;
-        for exe in [CLI_EXE, DAEMON_EXE] {
+        for exe in [CLI_EXE, DAEMON_EXE, UI_EXE] {
             copy_with_retry(&source.join(exe), &target.join(exe)).map_err(|e| {
                 tr!(
                     lang,
@@ -112,6 +113,12 @@ pub fn install(paths: &Paths, lang: Lang) -> Result<(), String> {
 
     let service = register_service(&target.join(DAEMON_EXE))
         .map_err(|e| tr!(lang, "install.failed", what = "service", error = e))?;
+    if let Err(e) = start_menu_shortcut(Some(&target.join(UI_EXE))) {
+        println!(
+            "{}",
+            tr!(lang, "install.failed", what = "Start menu", error = e)
+        );
+    }
     register_uninstaller(&target)
         .map_err(|e| tr!(lang, "install.failed", what = "registry", error = e))?;
     let dir = target.to_string_lossy().into_owned();
@@ -154,7 +161,8 @@ pub fn uninstall(paths: &Paths, lang: Lang) -> Result<(), String> {
         return run_elevated(&["uninstall", "--pause"], lang);
     }
 
-    let reasons = Store::<Config>::peek(&paths.config()).reasons;
+    let config = Store::<Config>::peek(&paths.config());
+    let reasons = config.reasons;
     let phrase = tr!(lang, "uninstall.phrase");
     let rule = "-".repeat(64);
     println!("{rule}");
@@ -168,6 +176,13 @@ pub fn uninstall(paths: &Paths, lang: Lang) -> Result<(), String> {
         for line in reasons.lines() {
             println!("    {line}");
         }
+    }
+    if !config.media.is_empty() {
+        println!();
+        println!(
+            "    {}",
+            tr!(lang, "uninstall.media", list = config.media.join(", "))
+        );
     }
     println!("{rule}");
     println!();
@@ -188,6 +203,7 @@ pub fn uninstall(paths: &Paths, lang: Lang) -> Result<(), String> {
         let _ = service.delete();
     }
     let _ = RegKey::predef(HKEY_LOCAL_MACHINE).delete_subkey_all(UNINSTALL_KEY);
+    let _ = start_menu_shortcut(None);
     let dir = target.to_string_lossy().into_owned();
     if let Err(e) = edit_machine_path(|path| path_without(path, &dir)) {
         println!(
@@ -381,6 +397,35 @@ fn copy_with_retry(from: &Path, to: &Path) -> io::Result<()> {
             Err(e) => return Err(e),
         }
     }
+}
+
+/// Creates (or, with `None`, removes) the shortcut to the settings window in
+/// the Start menu of every user.
+fn start_menu_shortcut(target: Option<&Path>) -> Result<(), String> {
+    let programs = std::env::var_os("ProgramData")
+        .map(PathBuf::from)
+        .unwrap_or_else(|| PathBuf::from(r"C:\ProgramData"))
+        .join(r"Microsoft\Windows\Start Menu\Programs");
+    let link = programs.join("despegate.lnk");
+    let Some(target) = target else {
+        let _ = std::fs::remove_file(&link);
+        return Ok(());
+    };
+    // Shortcuts are COM objects; the scripting shell writes one in a line.
+    let script = format!(
+        "$s = (New-Object -ComObject WScript.Shell).CreateShortcut('{}'); $s.TargetPath = '{}'; $s.WorkingDirectory = '{}'; $s.Save()",
+        link.display(),
+        target.display(),
+        target
+            .parent()
+            .map(Path::display)
+            .map(|d| d.to_string())
+            .unwrap_or_default()
+    );
+    run(
+        "powershell",
+        &["-NoProfile", "-NonInteractive", "-Command", &script],
+    )
 }
 
 fn register_uninstaller(target: &Path) -> io::Result<()> {

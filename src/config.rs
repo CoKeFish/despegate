@@ -32,9 +32,13 @@ pub const WEEK: [Weekday; 7] = [
 pub struct Config {
     /// Language code for everything despegate says. Unset follows Windows.
     pub language: Option<String>,
+    /// "light", "dark" or "system" (follow Windows) for the window and the lock screen.
+    pub appearance: String,
     /// The user's own words on why despegate is installed. Shown on the lock
     /// screen and before uninstalling.
     pub reasons: String,
+    /// Photos and videos shown with the reasons; file names in the media directory.
+    pub media: Vec<String>,
     /// A rule cannot be removed (nor settings weakened) this close to a block.
     pub lead_minutes: u32,
     /// How long before a block the warning banner appears.
@@ -54,7 +58,9 @@ impl Default for Config {
     fn default() -> Self {
         Config {
             language: None,
+            appearance: "system".into(),
             reasons: String::new(),
+            media: Vec::new(),
             lead_minutes: 30,
             warn_minutes: 5,
             emergency_chars: 80,

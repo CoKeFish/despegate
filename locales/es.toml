@@ -48,6 +48,16 @@ removed = "{app} ya no tiene límite diario."
 set = "Idioma: {name}."
 auto = "El idioma sigue al de Windows ({name})."
 
+[media]
+added = "Añadido {name}. Se verá en la pantalla de bloqueo."
+removed = "Quitado {name}."
+
+[appearance]
+set = "Apariencia: {mode}."
+system = "la de Windows"
+light = "clara"
+dark = "oscura"
+
 [why]
 block_active = "el bloqueo '{name}' está activo hasta {until}"
 block_imminent = "el bloqueo '{name}' empieza a las {start} (los cambios se cierran {lead} min antes de un bloqueo)"
@@ -78,7 +88,13 @@ allowance_range = "el límite debe estar entre 1 minuto y 24 horas"
 no_allowance = "{app} no tiene límite diario"
 allowance_used = "{app} ya se usó hoy ({used}); su límite se puede aflojar mañana, antes de abrirlo"
 language = "idioma desconocido '{code}'; disponibles: {list}"
+no_media = "no hay ninguna foto ni vídeo llamado '{name}'"
+media_unsupported = "solo se admiten archivos jpg, png, gif, webp, mp4 y webm"
+media_too_large = "el archivo pesa más de {max} MB"
+media_unreadable = "no se puede leer el archivo: {error}"
+media_unwritable = "no se puede guardar el archivo: {error}"
 reasons_empty = "las razones están vacías"
+no_ui = "no se puede abrir la ventana de ajustes: {error}"
 save = "no se pudo guardar la configuración: {error}"
 daemon_unreachable = "no se puede hablar con el daemon: {error}"
 no_daemon = "el daemon no está en marcha y sin él no se puede cambiar la configuración ({error}). Si despegate está instalado, se reinicia en unos segundos; inténtalo de nuevo."
@@ -104,6 +120,7 @@ emergency_on = "{minutes} min tras teclear {chars} caracteres"
 settings = "ajustes: margen {lead} min, aviso {warn} min, pausa de emergencia {emergency}"
 language = "idioma: {name}"
 language_auto = "idioma: {name} (el de Windows)"
+media = "fotos y vídeos: {list}"
 reasons_none = "razones: sin escribir (hazlo con `despegate reasons set`)"
 reasons = "razones:"
 
@@ -118,6 +135,8 @@ allowance_soon = "{app}: quedan {left} hoy"
 [lock]
 title = "Despégate."
 subtitle = "Bloqueado hasta las {until}  ·  faltan {left}"
+until = "Bloqueado hasta las {until}"
+left = "Faltan {left}"
 why = "POR QUÉ LO INSTALASTE"
 no_reasons = "No has escrito por qué instalaste despegate.\nHazlo con: despegate reasons set \"...\""
 emergency = "¿Emergencia? Teclea este texto tal cual para pausar despegate {minutes} minutos:"
@@ -143,6 +162,7 @@ about = "Estás a punto de desinstalar despegate."
 no_reasons = "Nunca escribiste por qué lo instalaste."
 your_reasons = "Por esto lo instalaste, con tus propias palabras:"
 confirm = "Si aun así quieres quitarlo, escribe: {phrase}"
+media = "Fotos y vídeos: {list}"
 not_confirmed = "Sin confirmar. despegate sigue instalado."
 path_failed = "No se pudo quitar {dir} del PATH: {error}"
 done = "despegate se ha desinstalado."
@@ -237,8 +257,26 @@ about = "Escribe tus razones; sin texto, las lee de la entrada estándar"
 [cli.reasons.set.arg]
 text = "Tus razones, con tus propias palabras"
 
+[cli.reasons.add]
+about = "Añade una foto o un vídeo (jpg, png, gif, webp, mp4, webm)"
+
+[cli.reasons.add.arg]
+file = "Ruta del archivo a copiar"
+
+[cli.reasons.remove]
+about = "Quita una foto o un vídeo por su nombre guardado"
+
+[cli.reasons.remove.arg]
+name = "Nombre tal como lo muestra `reasons show`"
+
 [cli.reasons.show]
-about = "Muestra tus razones"
+about = "Muestra tus razones y las fotos y vídeos que las acompañan"
+
+[cli.appearance]
+about = "Clara, oscura o la de Windows"
+
+[cli.appearance.arg]
+mode = "system, light o dark"
 
 [cli.language]
 about = "Muestra o elige el idioma"
@@ -257,5 +295,126 @@ value = "El nuevo valor"
 [cli.install]
 about = "Instala despegate para que arranque con Windows y resista que lo paren"
 
+[cli.ui]
+about = "Abre la ventana de ajustes"
+
 [cli.uninstall]
 about = "Quita despegate, después de leer tus razones"
+
+[ui]
+title = "despegate"
+working = "…"
+saved = "Guardado"
+save = "Guardar"
+add = "Añadir"
+remove = "Quitar"
+minutes = "min"
+minutes_long = "Minutos"
+characters = "caracteres"
+lock = "Bloquear la pantalla"
+apps = "Cerrar programas (steam.exe, …)"
+
+[ui.nav]
+home = "Semana"
+rules = "Reglas"
+breaks = "Descansos"
+allowances = "Límites"
+reasons = "Razones"
+settings = "Ajustes"
+
+[ui.hero]
+stopped = "No está en marcha."
+stopped_detail = "Ejecuta: despegate install"
+paused = "En pausa."
+on_break = "Descanso hasta las {until}."
+locked = "Bloqueado hasta {until}."
+blocking = "Cerrando {apps} hasta {until}."
+free = "Nada activo."
+next = "Siguiente: {name}, {when} (dentro de {left})"
+start_reasons = "Escribir mis razones"
+start_rule = "Añadir una regla"
+empty = "Todavía no hay reglas. Añade la primera aquí abajo."
+break_in = "Descanso en {left} de uso"
+
+[ui.week]
+lock = "pantalla bloqueada"
+apps = "programas cerrados"
+now = "ahora"
+
+[ui.now]
+heading = "Despégate ahora"
+start = "Empezar"
+
+[ui.confirm]
+yes = "Sí"
+no = "No"
+start = "No se puede cancelar. ¿Empezar?"
+remove = "¿Quitar?"
+
+[ui.rules]
+heading = "Reglas"
+empty = "Aún no hay reglas."
+new = "Nueva regla"
+name = "Nombre"
+from = "Desde"
+to = "Hasta"
+days = "Días"
+days_all = "Todos"
+days_weekdays = "Entre semana"
+days_weekends = "Fin de semana"
+active = "activa ahora"
+window = "de {from} a {to}."
+window_overnight = "de {from} a {to} del día siguiente."
+need_effect = "Marca «Bloquear la pantalla» o escribe algún programa a cerrar."
+
+[ui.days]
+every = "todos los días"
+
+[ui.effect]
+both = "Bloquea la pantalla y cierra {apps}."
+lock = "Bloquea la pantalla."
+close = "Cierra {apps}."
+
+[ui.breaks]
+heading = "Descansos"
+toggle = "Descansos forzados"
+every = "Cada"
+rest = "Durante"
+
+[ui.allowances]
+heading = "Límites diarios"
+empty = "Todavía no hay límites. Añade el primero aquí abajo."
+new = "Nuevo límite"
+app = "Programa (hearthstone.exe)"
+minutes = "Minutos al día"
+item = "{minutes} min/día, quedan {left} hoy"
+
+[ui.reasons]
+heading = "Tus razones"
+hint = "Frases, fotos o vídeos. Los verás en la pantalla de bloqueo, cuando toque."
+add = "Añadir foto o vídeo"
+drop = "o arrástralos aquí"
+pick_title = "Fotos y vídeos"
+pick_filter = "Fotos y vídeos"
+unsaved = "Cambios sin guardar"
+
+[ui.settings]
+heading = "Ajustes"
+lead_minutes = "Cierre antes de un bloqueo"
+lead_minutes_desc = "Tan cerca de un bloqueo ya no se puede aflojar nada."
+warn_minutes = "Aviso antes de un bloqueo"
+emergency_chars = "Texto de emergencia"
+emergency_chars_desc = "Se teclea en la pantalla de bloqueo para pausar. 0 lo quita."
+emergency_minutes = "Pausa de emergencia"
+language = "Idioma"
+appearance = "Apariencia"
+appearance_system = "La de Windows"
+appearance_light = "Clara"
+appearance_dark = "Oscura"
+auto = "El de Windows"
+
+[ui.about]
+status = "Estado completo"
+unavailable = "El daemon no responde."
+version = "despegate {version}"
+help = "Guía y código"

@@ -1,0 +1,170 @@
+<!doctype html>
+<html lang="__LANG__"__THEME__>
+<head>
+<meta charset="utf-8">
+<title>despegate</title>
+<style>__FONT__</style>
+<style>
+  /* The logo at full size: the screen gone dark, and on it the sticker with
+     its corner coming unstuck. Everything is sized from the window so it
+     looks the same at any resolution. */
+  :root { --screen: #1d1b45; --sticker: #f5b800; --fg: #1d1b45; --title: #1d1b45; --muted: #5e4a30; --rule: #c79500; --done: #1d1b45; --bad: #a3180f; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --screen: #0b0a1f; --sticker: #1d1b45; --fg: #eeedfb; --title: #f5b800; --muted: #a6a4cb; --rule: #3a3876; --done: #f5b800; --bad: #ff9f8c; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --screen: #0b0a1f; --sticker: #1d1b45; --fg: #eeedfb; --title: #f5b800; --muted: #a6a4cb; --rule: #3a3876; --done: #f5b800; --bad: #ff9f8c; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { height: 100%; margin: 0; background: var(--screen); color: var(--fg); overflow: hidden; }
+  body { font: 500 2.4vh/1.4 Gabarito, "Segoe UI", system-ui, sans-serif; padding: 6vmin; cursor: default; user-select: none; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+
+  .sticker { --cut: 12vmin; position: relative; isolation: isolate; height: 100%; padding: 6vmin 7vmin 5vmin; display: grid; grid-template-rows: auto minmax(0, 1fr) auto; gap: 3.5vh; }
+  .sticker::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 5vmin; background: var(--sticker);
+    -webkit-mask: linear-gradient(225deg, transparent calc(var(--cut) * 0.7071), #000 calc(var(--cut) * 0.7071 + 1px));
+    mask: linear-gradient(225deg, transparent calc(var(--cut) * 0.7071), #000 calc(var(--cut) * 0.7071 + 1px)); }
+  .flap { position: absolute; top: 0; right: 0; width: var(--cut); height: var(--cut); fill: var(--sticker);
+    transform-origin: 0 100%; transform: translate(calc(var(--cut) * 0.256), calc(var(--cut) * -0.256)) rotate(-12deg);
+    animation: peel 800ms cubic-bezier(0.23, 1, 0.32, 1) 300ms backwards; }
+  @keyframes peel { from { transform: translate(0, 0) rotate(0deg); } }
+
+  h1 { font-size: min(21vh, 13.5vw); line-height: 0.86; letter-spacing: -0.04em; margin: 0 0 0 -0.04em; font-weight: 900; color: var(--title); }
+  main { display: grid; grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr); gap: 5vw; min-height: 0; }
+  main:has(#media:empty) { grid-template-columns: minmax(0, 1fr); }
+  .words { display: flex; flex-direction: column; min-height: 0; }
+  .words p { margin: 0; }
+  #until { font-size: 3.6vh; line-height: 1.2; font-weight: 800; }
+  #left { font-size: 3.6vh; line-height: 1.2; color: var(--muted); }
+  #reasons { --size: 3.8vh; flex: 1 1 0; min-height: 0; overflow: hidden; margin-top: 4.5vh; font-size: calc(var(--size) * var(--shrink, 1)); line-height: 1.32; font-weight: 600; white-space: pre-line; text-wrap: pretty; max-width: 34em; }
+  main:has(#media:empty) #reasons { --size: 4.8vh; }
+  #reasons.empty { --size: 2.6vh; color: var(--muted); font-weight: 500; }
+
+  /* A photo or a video, stuck on like a print. */
+  #media { position: relative; min-height: 0; }
+  #media:empty { display: none; }
+  #media img, #media video { position: absolute; inset: 0; margin: auto; max-width: 96%; max-height: 96%; background: #fff; border: 1.1vmin solid #fff; border-radius: 0.7vmin; box-shadow: 0 1.4vmin 3.5vmin rgba(11, 10, 31, 0.3); transform: rotate(var(--tilt, 1.5deg)); animation: arrive 500ms cubic-bezier(0.23, 1, 0.32, 1) backwards; }
+  @keyframes arrive { from { opacity: 0; transform: rotate(var(--tilt, 1.5deg)) scale(0.97); } }
+
+  /* The way out, kept small: it is there for emergencies, not as an invitation. */
+  footer { border-top: 2px solid var(--rule); padding-top: 2vh; }
+  footer[hidden] { display: none; }
+  .prompt { color: var(--muted); font-size: 2vh; margin: 0 0 0.8vh; }
+  #challenge, #typed { font: 2.3vh/1.4 Consolas, monospace; }
+  #challenge { color: var(--muted); margin: 0 0 0.6vh; word-break: break-all; }
+  #challenge .done { color: var(--done); font-weight: 700; }
+  #typed { width: 100%; background: transparent; border: 0; border-bottom: 2px solid var(--rule); border-radius: 0; color: var(--done); caret-color: var(--done); outline: none; padding: 0.5vh 0; }
+  #typed:focus { border-bottom-color: var(--done); }
+  #typed.bad { color: var(--bad); border-bottom-color: var(--bad); }
+
+  @media (prefers-reduced-motion: reduce) {
+    .flap { animation: none; }
+    @keyframes arrive { from { opacity: 0; } }
+  }
+</style>
+</head>
+<body>
+<div class="sticker">
+  <svg class="flap" viewBox="0 0 86 86" aria-hidden="true"><path d="M8 0H78a8 8 0 0 1 8 8V78a8 8 0 0 1-8 8L0 8A8 8 0 0 1 8 0Z"/></svg>
+  <header>
+    <h1 id="title"></h1>
+  </header>
+  <main>
+    <div class="words">
+      <p id="until"></p>
+      <p id="left"></p>
+      <p id="reasons"></p>
+    </div>
+    <div id="media"></div>
+  </main>
+  <footer id="emergency" hidden>
+    <p class="prompt" id="prompt"></p>
+    <p id="challenge"></p>
+    <input id="typed" autocomplete="off" spellcheck="false" autofocus>
+  </footer>
+</div>
+<script>
+  const T = __I18N__;
+  const VIEW = __VIEW__;
+  const t = (key, vars = {}) => (T[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? "");
+  const $ = (id) => document.getElementById(id);
+
+  $("title").textContent = t("lock.title");
+  const until = new Date(VIEW.until);
+  $("until").textContent = t("lock.until", { until: until.toTimeString().slice(0, 5) });
+  function countdown() {
+    const seconds = Math.max(0, Math.round((until - Date.now()) / 1000));
+    const left = seconds >= 3600
+      ? `${Math.floor(seconds / 3600)} h ${String(Math.floor(seconds % 3600 / 60)).padStart(2, "0")} min`
+      : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, "0")}`;
+    $("left").textContent = t("lock.left", { left });
+  }
+  countdown();
+  setInterval(countdown, 1000);
+
+  const reasons = $("reasons");
+  if (VIEW.reasons) reasons.textContent = VIEW.reasons;
+  else { reasons.textContent = t("lock.no_reasons"); reasons.classList.add("empty"); }
+  // Long reasons are set smaller rather than cut off.
+  function fit() {
+    let shrink = 1;
+    reasons.style.removeProperty("--shrink");
+    while (reasons.scrollHeight > reasons.clientHeight + 1 && shrink > 0.5) {
+      shrink -= 0.05;
+      reasons.style.setProperty("--shrink", shrink);
+    }
+  }
+  fit();
+  window.addEventListener("resize", fit);
+
+  // Photos and videos take turns: a photo for a while, a video until it ends.
+  const media = $("media");
+  let index = -1;
+  function next() {
+    if (!VIEW.media.length) return;
+    index = (index + 1) % VIEW.media.length;
+    const item = VIEW.media[index];
+    media.replaceChildren();
+    media.style.setProperty("--tilt", index % 2 ? "-1.2deg" : "1.5deg");
+    if (item.kind === "video") {
+      const video = document.createElement("video");
+      video.src = item.url;
+      video.autoplay = true;
+      video.onended = next;
+      video.onerror = () => setTimeout(next, 1000);
+      if (VIEW.media.length === 1) video.loop = true;
+      media.append(video);
+      video.play().catch(() => {});
+    } else {
+      const img = document.createElement("img");
+      img.src = item.url;
+      img.onerror = () => setTimeout(next, 1000);
+      media.append(img);
+      if (VIEW.media.length > 1) setTimeout(next, 8000);
+    }
+  }
+  next();
+
+  if (VIEW.challenge) {
+    $("emergency").hidden = false;
+    $("prompt").textContent = t("lock.emergency", { minutes: VIEW.emergency_minutes });
+    // The part already typed right is marked on the text itself.
+    const done = document.createElement("span");
+    done.className = "done";
+    const rest = document.createTextNode(VIEW.challenge);
+    $("challenge").append(done, rest);
+    const typed = $("typed");
+    typed.addEventListener("input", () => {
+      const value = typed.value.toLowerCase();
+      if (value !== typed.value) typed.value = value;
+      const right = VIEW.challenge.startsWith(value);
+      typed.classList.toggle("bad", !right);
+      if (right) { done.textContent = value; rest.textContent = VIEW.challenge.slice(value.length); }
+      window.ipc.postMessage(JSON.stringify({ typed: value }));
+    });
+    const refocus = () => typed.focus();
+    document.addEventListener("click", refocus);
+    setInterval(refocus, 1000);
+    refocus();
+    fit();
+  }
+</script>
+</body>
+</html>

@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::config::{Allowance, AppError, BreakPolicy, Config, OneOff, Rule, WEEK, normalize_app};
 use crate::i18n::Lang;
+use crate::media::ImportError;
 use crate::overlay::{Mode, countdown};
 use crate::tr;
 use crate::usage::State;
@@ -39,6 +40,17 @@ pub enum Request {
     ReasonsSet {
         text: String,
     },
+    /// A photo or video to copy in; the file is read as the caller.
+    MediaImport {
+        source: String,
+    },
+    /// Registers a file already in the media directory (the daemon's own step).
+    MediaAdd {
+        name: String,
+    },
+    MediaRemove {
+        name: String,
+    },
     Set {
         key: Setting,
         value: u32,
@@ -58,6 +70,9 @@ pub enum Request {
     LanguageSet {
         code: Option<String>,
     },
+    AppearanceSet {
+        mode: Appearance,
+    },
     /// Sent by the agent in the user's session, never by the CLI.
     AgentSync(AgentReport),
 }
@@ -71,6 +86,25 @@ pub struct AgentReport {
     pub foreground: Option<String>,
     /// What has been typed on the lock screen towards the emergency challenge.
     pub typed: String,
+}
+
+#[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, clap::ValueEnum)]
+#[serde(rename_all = "snake_case")]
+pub enum Appearance {
+    /// Follow the Windows setting
+    System,
+    Light,
+    Dark,
+}
+
+impl Appearance {
+    pub fn code(self) -> &'static str {
+        match self {
+            Appearance::System => "system",
+            Appearance::Light => "light",
+            Appearance::Dark => "dark",
+        }
+    }
 }
 
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq, clap::ValueEnum)]
@@ -98,6 +132,9 @@ pub struct Response {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub struct View {
     pub lang: String,
+    /// "light", "dark" or "system".
+    #[serde(default)]
+    pub theme: String,
     pub mode: Mode,
 }
 
@@ -163,6 +200,26 @@ pub fn handle(
         }
         Request::AllowanceRemove { app } => allowance_set(cfg, &app, None, now, rt, lang),
         Request::LanguageSet { code } => language_set(cfg, code, lang, hint),
+        Request::AppearanceSet { mode } => {
+            cfg.appearance = mode.code().to_string();
+            let name = lang.format(&format!("appearance.{}", mode.code()), &[]);
+            Ok(tr!(lang, "appearance.set", mode = name))
+        }
+        Request::MediaImport { .. } => Err(tr!(lang, "error.not_agent")),
+        Request::MediaAdd { name } => {
+            if !cfg.media.contains(&name) {
+                cfg.media.push(name.clone());
+            }
+            Ok(tr!(lang, "media.added", name = name))
+        }
+        Request::MediaRemove { name } => {
+            if !cfg.media.contains(&name) {
+                Err(tr!(lang, "error.no_media", name = name))
+            } else {
+                cfg.media.retain(|m| *m != name);
+                Ok(tr!(lang, "media.removed", name = name))
+            }
+        }
         Request::AgentSync(_) => Err(tr!(lang, "error.not_agent")),
     };
     match result {
@@ -178,6 +235,20 @@ pub fn handle(
             },
             changed: false,
         },
+    }
+}
+
+/// Why a photo or video could not be taken in.
+pub fn import_error(error: ImportError, lang: Lang) -> String {
+    match error {
+        ImportError::Unsupported => tr!(lang, "error.media_unsupported"),
+        ImportError::TooLarge => tr!(
+            lang,
+            "error.media_too_large",
+            max = crate::media::MAX_BYTES / (1024 * 1024)
+        ),
+        ImportError::Unreadable(e) => tr!(lang, "error.media_unreadable", error = e),
+        ImportError::Unwritable(e) => tr!(lang, "error.media_unwritable", error = e),
     }
 }
 
@@ -689,6 +760,9 @@ fn status(cfg: &Config, now: NaiveDateTime, rt: &Runtime, lang: Lang) -> String 
         None => tr!(lang, "status.language_auto", name = lang.name()),
     });
 
+    if !cfg.media.is_empty() {
+        lines.push(tr!(lang, "status.media", list = cfg.media.join(", ")));
+    }
     if cfg.reasons.is_empty() {
         lines.push(tr!(lang, "status.reasons_none"));
     } else {

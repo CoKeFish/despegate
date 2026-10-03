@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <title>despegate</title>
+  <!-- The screen, coming unstuck: a corner has let go and lifts away. -->
+  <path fill="#f5b800" d="M26 40H122a16 16 0 0 1 11 5L216 126V230a26 26 0 0 1-26 26H26A26 26 0 0 1 0 230V66A26 26 0 0 1 26 40Z"/>
+  <path fill="#f5b800" transform="translate(152 18) rotate(-12 0 86)" d="M8 0H78a8 8 0 0 1 8 8V78a8 8 0 0 1-8 8L0 8A8 8 0 0 1 8 0Z"/>
+</svg>

@@ -4,7 +4,7 @@
 //! says what should be visible; a timer on this thread makes the windows
 //! match it and keeps the lock on top of everything else.
 
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::ptr::{null, null_mut};
 use std::sync::{Arc, Mutex, OnceLock};
 
@@ -39,6 +39,8 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
 };
 
 use crate::i18n::Lang;
+use crate::paths::Paths;
+use crate::web;
 use crate::{tr, wide};
 
 /// What the UI thread draws. The agent keeps it in step with the daemon.
@@ -46,6 +48,8 @@ use crate::{tr, wide};
 pub struct UiState {
     pub mode: Mode,
     pub lang: Lang,
+    /// "light", "dark" or "system".
+    pub theme: String,
     /// What the user has typed so far towards the emergency challenge.
     pub typed: String,
 }
@@ -65,6 +69,9 @@ pub enum Mode {
 pub struct LockView {
     pub until: NaiveDateTime,
     pub reasons: String,
+    /// Photos and videos, as stored names in the media directory.
+    #[serde(default)]
+    pub media: Vec<String>,
     pub challenge: Option<String>,
     pub emergency_minutes: u32,
 }
@@ -89,13 +96,35 @@ const fn rgb(r: u8, g: u8, b: u8) -> COLORREF {
     (r as u32) | ((g as u32) << 8) | ((b as u32) << 16)
 }
 
-const BACKGROUND: COLORREF = rgb(12, 12, 16);
-const WHITE: COLORREF = rgb(240, 240, 245);
-const MUTED: COLORREF = rgb(140, 148, 165);
-const GOOD: COLORREF = rgb(110, 220, 140);
-const BAD: COLORREF = rgb(240, 100, 100);
-const BANNER_BACKGROUND: COLORREF = rgb(255, 196, 0);
-const BANNER_TEXT: COLORREF = rgb(20, 20, 20);
+/// The same palette as the lock page, for what is drawn by hand: the dark
+/// screen the sticker sits on, which is also what the other monitors show.
+struct Palette {
+    background: COLORREF,
+    title: COLORREF,
+    text: COLORREF,
+    muted: COLORREF,
+    good: COLORREF,
+    bad: COLORREF,
+}
+
+const LIGHT: Palette = Palette {
+    background: rgb(29, 27, 69),
+    title: rgb(245, 184, 0),
+    text: rgb(238, 237, 251),
+    muted: rgb(166, 164, 203),
+    good: rgb(245, 184, 0),
+    bad: rgb(255, 159, 140),
+};
+const DARK: Palette = Palette {
+    background: rgb(11, 10, 31),
+    ..LIGHT
+};
+const BANNER_BACKGROUND: COLORREF = rgb(245, 184, 0);
+const BANNER_TEXT: COLORREF = rgb(29, 27, 69);
+
+fn palette(theme: &str) -> &'static Palette {
+    if web::is_dark(theme) { &DARK } else { &LIGHT }
+}
 
 #[derive(Clone, Copy, PartialEq)]
 struct Monitor {
@@ -111,6 +140,10 @@ struct Windows {
     monitors: Vec<Monitor>,
     /// One per monitor, the primary monitor's first.
     lock: Vec<HWND>,
+    /// The lock screen page inside the primary lock window, and what it shows.
+    /// Without it (no WebView2 runtime) the lock screen is drawn by hand.
+    web: Option<wry::WebView>,
+    web_for: Option<LockView>,
     banner: HWND,
     hook: HHOOK,
 }
@@ -120,6 +153,8 @@ impl Default for Windows {
         Windows {
             monitors: Vec::new(),
             lock: Vec::new(),
+            web: None,
+            web_for: None,
             banner: null_mut(),
             hook: null_mut(),
         }
@@ -127,9 +162,12 @@ impl Default for Windows {
 }
 
 static UI: OnceLock<Arc<Mutex<UiState>>> = OnceLock::new();
+static PATHS: OnceLock<Paths> = OnceLock::new();
 
 thread_local! {
     static WINDOWS: RefCell<Windows> = RefCell::default();
+    /// Creating a web view pumps messages, which would re-enter the timer.
+    static BUSY: Cell<bool> = const { Cell::new(false) };
 }
 
 fn snapshot() -> UiState {
@@ -139,8 +177,9 @@ fn snapshot() -> UiState {
 }
 
 /// Runs the UI message loop. Does not return while the process lives.
-pub fn run(ui: Arc<Mutex<UiState>>) {
+pub fn run(ui: Arc<Mutex<UiState>>, paths: Paths) {
     let _ = UI.set(ui);
+    let _ = PATHS.set(paths);
     unsafe {
         SetProcessDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2);
         let instance = GetModuleHandleW(null());
@@ -188,11 +227,15 @@ const CLASS: &str = "despegate-overlay";
 unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> LRESULT {
     match msg {
         WM_TIMER => {
+            if BUSY.replace(true) {
+                return 0;
+            }
             // The window procedure is re-entered while windows are created and
             // destroyed, so the bookkeeping is taken out of the cell meanwhile.
             let mut windows = WINDOWS.take();
             unsafe { reconcile(&mut windows) };
             WINDOWS.set(windows);
+            BUSY.set(false);
             0
         }
         WM_PAINT => {
@@ -216,10 +259,11 @@ unsafe extern "system" fn wndproc(hwnd: HWND, msg: u32, wparam: WPARAM, lparam: 
 /// Makes the windows on screen match the mode the daemon asked for.
 unsafe fn reconcile(windows: &mut Windows) {
     unsafe {
-        match snapshot().mode {
-            Mode::Lock(_) => {
+        let state = snapshot();
+        match state.mode {
+            Mode::Lock(view) => {
                 destroy_banner(windows);
-                show_lock(windows);
+                show_lock(windows, &view, state.lang, &state.theme);
             }
             Mode::Banner { .. } => {
                 destroy_lock(windows);
@@ -261,7 +305,7 @@ unsafe fn create_window(
     }
 }
 
-unsafe fn show_lock(windows: &mut Windows) {
+unsafe fn show_lock(windows: &mut Windows, view: &LockView, lang: Lang, theme: &str) {
     unsafe {
         let monitors = monitors();
         if windows.lock.is_empty() || monitors != windows.monitors {
@@ -296,14 +340,41 @@ unsafe fn show_lock(windows: &mut Windows) {
             );
             InvalidateRect(*hwnd, null(), 0);
         }
-        if let Some(primary) = windows.lock.first() {
-            take_foreground(*primary);
+        let Some(primary) = windows.lock.first().copied() else {
+            return;
+        };
+        // The page shows one lock session; a new challenge or end time means a new page.
+        if windows.web_for.as_ref() != Some(view) {
+            windows.web = None;
+            windows.web_for = Some(view.clone());
+            if let (Some(paths), Some(ui), Some(m)) =
+                (PATHS.get(), UI.get(), windows.monitors.first())
+            {
+                windows.web = web::build_lock(
+                    primary,
+                    (m.width, m.height),
+                    view,
+                    lang,
+                    theme,
+                    paths,
+                    ui.clone(),
+                )
+                .ok();
+            }
+        }
+        if take_foreground(primary)
+            && let Some(web) = &windows.web
+        {
+            let _ = web.focus();
         }
     }
 }
 
 unsafe fn destroy_lock(windows: &mut Windows) {
     unsafe {
+        // The page goes before the window that holds it.
+        windows.web = None;
+        windows.web_for = None;
         for hwnd in windows.lock.drain(..) {
             DestroyWindow(hwnd);
         }
@@ -354,11 +425,12 @@ unsafe fn destroy_banner(windows: &mut Windows) {
 
 /// Windows refuses to hand the foreground to a background process unless its
 /// input queue is attached to the current foreground thread's.
-unsafe fn take_foreground(hwnd: HWND) {
+/// Returns whether the foreground had to be taken.
+unsafe fn take_foreground(hwnd: HWND) -> bool {
     unsafe {
         let foreground = GetForegroundWindow();
         if foreground == hwnd {
-            return;
+            return false;
         }
         let me = GetCurrentThreadId();
         let other = if foreground.is_null() {
@@ -372,6 +444,7 @@ unsafe fn take_foreground(hwnd: HWND) {
         if attached {
             AttachThreadInput(me, other, 0);
         }
+        true
     }
 }
 
@@ -478,9 +551,14 @@ unsafe fn paint(hwnd: HWND) {
 
         let state = snapshot();
         match (GetWindowLongPtrW(hwnd, GWLP_USERDATA), &state.mode) {
-            (KIND_LOCK_PRIMARY, Mode::Lock(view)) => {
-                draw_lock(buffer, rc, view, &state.typed, state.lang)
-            }
+            (KIND_LOCK_PRIMARY, Mode::Lock(view)) => draw_lock(
+                buffer,
+                rc,
+                view,
+                &state.typed,
+                state.lang,
+                palette(&state.theme),
+            ),
             (KIND_BANNER, Mode::Banner { text }) => {
                 fill(buffer, rc, BANNER_BACKGROUND);
                 let style = Text {
@@ -497,7 +575,7 @@ unsafe fn paint(hwnd: HWND) {
                     DT_CENTER | DT_VCENTER | DT_SINGLELINE | DT_NOPREFIX,
                 );
             }
-            _ => fill(buffer, rc, BACKGROUND),
+            _ => fill(buffer, rc, palette(&state.theme).background),
         }
 
         BitBlt(hdc, 0, 0, rc.right, rc.bottom, buffer, 0, 0, SRCCOPY);
@@ -559,7 +637,7 @@ unsafe fn draw_text(hdc: HDC, text: &str, mut rc: RECT, style: &Text, format: u3
 
 /// The lock screen is laid out in fractions of the window height so it looks
 /// the same at any resolution and DPI.
-unsafe fn draw_lock(hdc: HDC, rc: RECT, view: &LockView, typed: &str, lang: Lang) {
+unsafe fn draw_lock(hdc: HDC, rc: RECT, view: &LockView, typed: &str, lang: Lang, p: &Palette) {
     let (w, h) = (rc.right, rc.bottom);
     let band = |from: f32, to: f32, margin: f32| RECT {
         left: (w as f32 * margin) as i32,
@@ -596,33 +674,33 @@ unsafe fn draw_lock(hdc: HDC, rc: RECT, view: &LockView, typed: &str, lang: Lang
     };
 
     unsafe {
-        fill(hdc, rc, BACKGROUND);
+        fill(hdc, rc, p.background);
         draw_text(
             hdc,
             &tr!(lang, "lock.title"),
             band(0.09, 0.24, 0.05),
-            &sans(h / 8, 700, WHITE),
+            &sans(h / 8, 700, p.title),
             line,
         );
         draw_text(
             hdc,
             &subtitle,
             band(0.25, 0.31, 0.05),
-            &sans(h / 30, 400, MUTED),
+            &sans(h / 30, 400, p.muted),
             line,
         );
         draw_text(
             hdc,
             &tr!(lang, "lock.why"),
             band(0.37, 0.41, 0.05),
-            &sans(h / 52, 600, MUTED),
+            &sans(h / 52, 600, p.muted),
             line,
         );
         draw_text(
             hdc,
             &reasons,
             band(0.42, 0.74, 0.16),
-            &sans(h / 26, 400, WHITE),
+            &sans(h / 26, 400, p.text),
             wrapped,
         );
 
@@ -632,20 +710,20 @@ unsafe fn draw_lock(hdc: HDC, rc: RECT, view: &LockView, typed: &str, lang: Lang
                 hdc,
                 &prompt,
                 band(0.77, 0.80, 0.05),
-                &sans(h / 52, 400, MUTED),
+                &sans(h / 52, 400, p.muted),
                 line,
             );
             draw_text(
                 hdc,
                 challenge,
                 band(0.81, 0.89, 0.10),
-                &mono(MUTED),
+                &mono(p.muted),
                 wrapped,
             );
             let color = if challenge.starts_with(typed) {
-                GOOD
+                p.good
             } else {
-                BAD
+                p.bad
             };
             draw_text(hdc, typed, band(0.90, 0.98, 0.10), &mono(color), wrapped);
         }
@@ -661,6 +739,7 @@ mod tests {
             mode: Mode::Lock(LockView {
                 until: NaiveDateTime::default(),
                 reasons: String::new(),
+                media: Vec::new(),
                 challenge: challenge.map(str::to_string),
                 emergency_minutes: 5,
             }),

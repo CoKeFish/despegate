@@ -115,6 +115,18 @@ impl Lang {
         self.template(key).is_some()
     }
 
+    /// Every key starting with `prefix`, with its text in this language.
+    pub fn section(self, prefix: &str) -> Vec<(String, String)> {
+        let mut keys: Vec<&String> = catalogs()[Lang::EN.0]
+            .keys()
+            .filter(|k| k.starts_with(prefix))
+            .collect();
+        keys.sort();
+        keys.into_iter()
+            .map(|key| (key.clone(), self.template(key).unwrap_or(key).to_string()))
+            .collect()
+    }
+
     /// The text for `key` with each `{name}` replaced by its argument. A key
     /// nobody translated shows up as the key itself, which is easy to spot.
     pub fn format(self, key: &str, args: &[(&str, String)]) -> String {

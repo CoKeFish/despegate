@@ -49,6 +49,16 @@ removed = "{app} no longer has a daily limit."
 set = "Language set to {name}."
 auto = "Language follows Windows ({name})."
 
+[media]
+added = "Added {name}. It will be shown on the lock screen."
+removed = "Removed {name}."
+
+[appearance]
+set = "Appearance: {mode}."
+system = "follow Windows"
+light = "light"
+dark = "dark"
+
 [why]
 block_active = "block '{name}' is active until {until}"
 block_imminent = "block '{name}' starts at {start} (changes close {lead} min before a block)"
@@ -79,7 +89,13 @@ allowance_range = "the allowance must be between 1 minute and 24 hours"
 no_allowance = "{app} has no daily limit"
 allowance_used = "{app} was already used today ({used}); its limit can be loosened tomorrow, before you open it"
 language = "unknown language '{code}'; available: {list}"
+no_media = "there is no photo or video called '{name}'"
+media_unsupported = "only jpg, png, gif, webp, mp4 and webm files can be added"
+media_too_large = "the file is bigger than {max} MB"
+media_unreadable = "the file cannot be read: {error}"
+media_unwritable = "the file cannot be stored: {error}"
 reasons_empty = "the reasons are empty"
+no_ui = "cannot open the settings window: {error}"
 save = "could not save the config: {error}"
 daemon_unreachable = "cannot talk to the daemon: {error}"
 no_daemon = "the daemon is not running and the config cannot be changed without it ({error}). If despegate is installed it restarts within seconds; try again."
@@ -105,6 +121,7 @@ emergency_on = "{minutes} min after typing {chars} characters"
 settings = "settings: lead {lead} min, warning {warn} min, emergency pause {emergency}"
 language = "language: {name}"
 language_auto = "language: {name} (following Windows)"
+media = "photos and videos: {list}"
 reasons_none = "reasons: not set (write them with `despegate reasons set`)"
 reasons = "reasons:"
 
@@ -119,6 +136,8 @@ allowance_soon = "{app}: {left} left today"
 [lock]
 title = "Despégate."
 subtitle = "Blocked until {until}  ·  {left} left"
+until = "Blocked until {until}"
+left = "{left} left"
 why = "WHY YOU SET THIS UP"
 no_reasons = "You have not written down why you installed despegate.\nDo it with: despegate reasons set \"...\""
 emergency = "Emergency? Type this text exactly to pause despegate for {minutes} minutes:"
@@ -144,6 +163,7 @@ about = "You are about to uninstall despegate."
 no_reasons = "You never wrote down why you installed it."
 your_reasons = "This is why you installed it, in your own words:"
 confirm = "If you still want to remove it, type: {phrase}"
+media = "Photos and videos: {list}"
 not_confirmed = "Not confirmed. despegate stays installed."
 path_failed = "Could not remove {dir} from PATH: {error}"
 done = "despegate has been uninstalled."
@@ -238,8 +258,26 @@ about = "Write your reasons; with no text, reads them from standard input"
 [cli.reasons.set.arg]
 text = "Your reasons, in your own words"
 
+[cli.reasons.add]
+about = "Add a photo or video (jpg, png, gif, webp, mp4, webm)"
+
+[cli.reasons.add.arg]
+file = "Path of the file to copy in"
+
+[cli.reasons.remove]
+about = "Remove a photo or video by its stored name"
+
+[cli.reasons.remove.arg]
+name = "Name as shown by `reasons show`"
+
 [cli.reasons.show]
-about = "Print your reasons"
+about = "Print your reasons and the photos and videos that go with them"
+
+[cli.appearance]
+about = "Light, dark, or follow Windows"
+
+[cli.appearance.arg]
+mode = "system, light or dark"
 
 [cli.language]
 about = "Show or choose the language"
@@ -258,5 +296,126 @@ value = "The new value"
 [cli.install]
 about = "Install despegate so it starts with Windows and resists being stopped"
 
+[cli.ui]
+about = "Open the settings window"
+
 [cli.uninstall]
 about = "Remove despegate, after reading your reasons"
+
+[ui]
+title = "despegate"
+working = "…"
+saved = "Saved"
+save = "Save"
+add = "Add"
+remove = "Remove"
+minutes = "min"
+minutes_long = "Minutes"
+characters = "characters"
+lock = "Lock the screen"
+apps = "Close programs (steam.exe, …)"
+
+[ui.nav]
+home = "Week"
+rules = "Rules"
+breaks = "Breaks"
+allowances = "Limits"
+reasons = "Reasons"
+settings = "Settings"
+
+[ui.hero]
+stopped = "Not running."
+stopped_detail = "Run: despegate install"
+paused = "Paused."
+on_break = "Break until {until}."
+locked = "Locked until {until}."
+blocking = "Closing {apps} until {until}."
+free = "Nothing active."
+next = "Next: {name}, {when} (in {left})"
+start_reasons = "Write my reasons"
+start_rule = "Add a rule"
+empty = "No rules yet. Add the first one below."
+break_in = "Break in {left} of use"
+
+[ui.week]
+lock = "screen locked"
+apps = "programs closed"
+now = "now"
+
+[ui.now]
+heading = "Step away now"
+start = "Start"
+
+[ui.confirm]
+yes = "Yes"
+no = "No"
+start = "Cannot be cancelled. Start?"
+remove = "Remove?"
+
+[ui.rules]
+heading = "Rules"
+empty = "No rules yet."
+new = "New rule"
+name = "Name"
+from = "From"
+to = "To"
+days = "Days"
+days_all = "Every day"
+days_weekdays = "Weekdays"
+days_weekends = "Weekends"
+active = "active now"
+window = "{from} to {to}."
+window_overnight = "{from} to {to} the next day."
+need_effect = "Tick \"Lock the screen\" or name a program to close."
+
+[ui.days]
+every = "every day"
+
+[ui.effect]
+both = "Locks the screen and closes {apps}."
+lock = "Locks the screen."
+close = "Closes {apps}."
+
+[ui.breaks]
+heading = "Breaks"
+toggle = "Forced breaks"
+every = "Every"
+rest = "For"
+
+[ui.allowances]
+heading = "Daily limits"
+empty = "No limits yet. Add the first one below."
+new = "New limit"
+app = "Program (hearthstone.exe)"
+minutes = "Minutes per day"
+item = "{minutes} min/day, {left} left today"
+
+[ui.reasons]
+heading = "Your reasons"
+hint = "Words, photos or videos. You will see them on the lock screen, when it matters."
+add = "Add photo or video"
+drop = "or drop them here"
+pick_title = "Photos and videos"
+pick_filter = "Photos and videos"
+unsaved = "Unsaved changes"
+
+[ui.settings]
+heading = "Settings"
+lead_minutes = "Lock-in before a block"
+lead_minutes_desc = "Nothing can be loosened this close to a block."
+warn_minutes = "Warning before a block"
+emergency_chars = "Emergency text"
+emergency_chars_desc = "Typed on the lock screen to pause. 0 removes it."
+emergency_minutes = "Emergency pause"
+language = "Language"
+appearance = "Appearance"
+appearance_system = "Follow Windows"
+appearance_light = "Light"
+appearance_dark = "Dark"
+auto = "Follow Windows"
+
+[ui.about]
+status = "Full status"
+unavailable = "No answer from the daemon."
+version = "despegate {version}"
+help = "Guide and source code"

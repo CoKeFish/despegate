@@ -12,12 +12,15 @@ pub mod i18n;
 pub mod install;
 pub mod ipc;
 pub mod log;
+pub mod media;
 pub mod overlay;
 pub mod paths;
 pub mod service;
 pub mod session;
 pub mod store;
+pub mod ui;
 pub mod usage;
+pub mod web;
 pub mod winsvc;
 
 /// Null-terminated UTF-16 copy of `s`, for Win32 `PCWSTR` parameters.

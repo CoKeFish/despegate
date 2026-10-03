@@ -32,7 +32,7 @@ pub fn run(paths: Paths) {
         let pipe = paths.pipe();
         thread::spawn(move || sync(&pipe, &ui));
     }
-    overlay::run(ui);
+    overlay::run(ui, paths);
 }
 
 /// Keeps reporting to the daemon and showing what it answers. Exits the
@@ -83,6 +83,7 @@ fn show(ui: &mut UiState, view: View) {
         ui.typed.clear();
     }
     ui.lang = Lang::from_code(&view.lang).unwrap_or_default();
+    ui.theme = view.theme;
     ui.mode = view.mode;
 }
 
@@ -94,6 +95,7 @@ mod tests {
         Mode::Lock(LockView {
             until: Default::default(),
             reasons: String::new(),
+            media: Vec::new(),
             challenge: challenge.map(str::to_string),
             emergency_minutes: 5,
         })
@@ -102,6 +104,7 @@ mod tests {
     fn view(mode: Mode) -> View {
         View {
             lang: "es".into(),
+            theme: "system".into(),
             mode,
         }
     }

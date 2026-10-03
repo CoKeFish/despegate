@@ -21,7 +21,7 @@ use crate::service::{self, AgentReport, Call, Request, Response, Runtime, View};
 use crate::session::{self, Agent};
 use crate::store::Store;
 use crate::usage::{Sensors, State};
-use crate::{enforce, ipc, log, tr, wide};
+use crate::{enforce, ipc, log, media, tr, wide};
 
 const TICK: Duration = Duration::from_secs(1);
 const FLASH: Duration = Duration::from_secs(6);
@@ -110,8 +110,11 @@ pub fn run(paths: Paths, host: Host, stop: &AtomicBool) -> Result<(), String> {
     {
         let shared = shared.clone();
         let pipe = paths.pipe();
+        let pipe_paths = paths.clone();
         thread::spawn(move || {
-            let result = ipc::serve(&pipe, |call, client| answer(&shared, call, client));
+            let result = ipc::serve(&pipe, |call, client| {
+                answer(&shared, &pipe_paths, call, client)
+            });
             // Without the pipe neither the CLI nor the agent can reach us;
             // exiting lets the service manager start a healthy daemon.
             log!("ipc server stopped: {result:?}");
@@ -160,13 +163,46 @@ where
     }
 }
 
-fn answer(shared: &Mutex<Shared>, call: Call, client: u32) -> Response {
+fn answer(shared: &Mutex<Shared>, paths: &Paths, call: Call, client: &ipc::Client) -> Response {
     let now = Local::now().naive_local();
     let mut shared = shared.lock().unwrap();
     let shared = &mut *shared;
+    let hint = Lang::from_code(&call.lang).unwrap_or_default();
+    let lang = Lang::resolve(shared.config.data.language.as_deref(), Some(hint.code()));
 
-    if let Request::AgentSync(report) = call.request {
-        if shared.agent_pid != Some(client) {
+    // Media files are read as the caller, so the daemon's own rights never
+    // let anyone copy a file they could not read themselves.
+    let request = match call.request {
+        Request::MediaImport { source } => {
+            let source = std::path::PathBuf::from(source);
+            let bytes = client.as_client(|| media::read_source(&source));
+            let stored = bytes
+                .map_err(media::ImportError::Unreadable)
+                .and_then(|bytes| bytes)
+                .and_then(|bytes| media::store(paths, &source, &bytes));
+            match stored {
+                Ok(name) => Request::MediaAdd { name },
+                Err(e) => {
+                    return Response {
+                        ok: false,
+                        message: service::import_error(e, lang),
+                        view: None,
+                    };
+                }
+            }
+        }
+        Request::MediaAdd { .. } => {
+            return Response {
+                ok: false,
+                message: tr!(lang, "error.not_agent"),
+                view: None,
+            };
+        }
+        other => other,
+    };
+
+    if let Request::AgentSync(report) = request {
+        if shared.agent_pid != Some(client.pid) {
             return Response {
                 ok: false,
                 message: "not the current agent".into(),
@@ -194,21 +230,25 @@ fn answer(shared: &Mutex<Shared>, call: Call, client: u32) -> Response {
         };
     }
 
-    let hint = Lang::from_code(&call.lang).unwrap_or_default();
     let runtime = Runtime {
         daemon: true,
         paused_until: shared.paused_until,
         state: &shared.state.data,
     };
     let outcome = service::handle(
-        call.request.clone(),
+        request.clone(),
         &mut shared.config.data,
         now,
         &runtime,
         hint,
     );
+    if outcome.changed
+        && let Request::MediaRemove { name } = &request
+    {
+        media::remove(paths, name);
+    }
     if outcome.changed {
-        log!("accepted {:?}", call.request);
+        log!("accepted {request:?}");
         if let Err(e) = shared.config.save() {
             let lang = Lang::resolve(shared.config.data.language.as_deref(), Some(hint.code()));
             let message = tr!(lang, "error.save", error = e);
@@ -336,6 +376,7 @@ impl Daemon {
                         Mode::Lock(LockView {
                             until,
                             reasons: config.reasons.clone(),
+                            media: config.media.clone(),
                             challenge: shared.challenge.clone(),
                             emergency_minutes: config.emergency_minutes,
                         })
@@ -349,6 +390,7 @@ impl Daemon {
         }
         shared.view = View {
             lang: lang.code().to_string(),
+            theme: config.appearance.clone(),
             mode,
         };
         true

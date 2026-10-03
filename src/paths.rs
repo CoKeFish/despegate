@@ -51,6 +51,11 @@ impl Paths {
         self.home.join("state.toml")
     }
 
+    /// Photos and videos that go with the reasons.
+    pub fn media_dir(&self) -> PathBuf {
+        self.home.join("media")
+    }
+
     pub fn log(&self) -> PathBuf {
         self.home.join("despegate.log")
     }

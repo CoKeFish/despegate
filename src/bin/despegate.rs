@@ -9,10 +9,10 @@ use clap::{Arg, ArgAction, CommandFactory, FromArgMatches, Parser, Subcommand};
 use despegate::config::{Config, Rule, WEEK};
 use despegate::i18n::Lang;
 use despegate::paths::Paths;
-use despegate::service::{self, Request, Response, Runtime, Setting};
+use despegate::service::{self, Appearance, Request, Response, Runtime, Setting};
 use despegate::store::Store;
 use despegate::usage::State;
-use despegate::{install, ipc, tr};
+use despegate::{install, ipc, media, tr, ui};
 
 // The help texts below are the English fallback; `localize` replaces them
 // with the catalog's (`cli.*` in locales/) for the language in use.
@@ -56,6 +56,8 @@ enum Command {
     /// The message with your reasons for installing despegate
     #[command(subcommand)]
     Reasons(ReasonsCommand),
+    /// Light, dark, or follow Windows
+    Appearance { mode: Appearance },
     /// Show or choose the language
     Language {
         /// A language code such as en or es, or auto to follow Windows
@@ -68,6 +70,8 @@ enum Command {
         #[arg(long, hide = true)]
         pause: bool,
     },
+    /// Open the settings window
+    Ui,
     /// Remove despegate, after reading your reasons
     Uninstall {
         #[arg(long, hide = true)]
@@ -138,7 +142,17 @@ enum AllowanceCommand {
 enum ReasonsCommand {
     /// Write your reasons; with no text, reads them from standard input
     Set { text: Vec<String> },
-    /// Print your reasons
+    /// Add a photo or video (jpg, png, gif, webp, mp4, webm)
+    Add {
+        /// Path of the file to copy in
+        file: PathBuf,
+    },
+    /// Remove a photo or video by its stored name
+    Remove {
+        /// Name as shown by `reasons show`
+        name: String,
+    },
+    /// Print your reasons and the photos and videos that go with them
     Show,
 }
 
@@ -367,11 +381,21 @@ fn main() -> ExitCode {
             }
             Request::ReasonsSet { text }
         }
+        Command::Reasons(ReasonsCommand::Add { file }) => {
+            let file = std::path::absolute(&file).unwrap_or(file);
+            Request::MediaImport {
+                source: file.to_string_lossy().into_owned(),
+            }
+        }
+        Command::Reasons(ReasonsCommand::Remove { name }) => Request::MediaRemove { name },
         Command::Reasons(ReasonsCommand::Show) => {
             if config.reasons.is_empty() {
                 println!("{}", tr!(lang, "reasons.none"));
             } else {
                 println!("{}", config.reasons);
+            }
+            for name in &config.media {
+                println!("  {name}");
             }
             return ExitCode::SUCCESS;
         }
@@ -389,7 +413,17 @@ fn main() -> ExitCode {
         Command::Language { code: Some(code) } => Request::LanguageSet {
             code: (code != "auto").then_some(code),
         },
+        Command::Appearance { mode } => Request::AppearanceSet { mode },
         Command::Set { key, value } => Request::Set { key, value },
+        Command::Ui => {
+            let exe = std::env::current_exe().map(|exe| exe.with_file_name(ui::UI_EXE));
+            let started =
+                exe.and_then(|exe| std::process::Command::new(exe).args(paths.args()).spawn());
+            return match started {
+                Ok(_) => ExitCode::SUCCESS,
+                Err(e) => fail(&tr!(lang, "error.no_ui", error = e)),
+            };
+        }
         Command::Install { pause } => return finish(install::install(&paths, lang), pause, lang),
         Command::Uninstall { pause } => {
             return finish(install::uninstall(&paths, lang), pause, lang);
@@ -455,7 +489,29 @@ fn apply_locally(paths: &Paths, request: Request, lang: Lang) -> Response {
         Ok(store) => store,
         Err(e) => return refusal(tr!(lang, "error.no_daemon", error = e)),
     };
-    let outcome = service::handle(request, &mut store.data, now, &runtime, Lang::system());
+    let request = match request {
+        Request::MediaImport { source } => {
+            let source = PathBuf::from(source);
+            match media::read_source(&source).and_then(|bytes| media::store(paths, &source, &bytes))
+            {
+                Ok(name) => Request::MediaAdd { name },
+                Err(e) => return refusal(service::import_error(e, lang)),
+            }
+        }
+        other => other,
+    };
+    let outcome = service::handle(
+        request.clone(),
+        &mut store.data,
+        now,
+        &runtime,
+        Lang::system(),
+    );
+    if outcome.changed
+        && let Request::MediaRemove { name } = &request
+    {
+        media::remove(paths, name);
+    }
     if outcome.changed
         && let Err(e) = store.save()
     {
