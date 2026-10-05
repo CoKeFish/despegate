@@ -37,6 +37,10 @@
   main:has(#media:empty) #reasons { --size: 4.8vh; }
   #reasons.empty { --size: 2.6vh; color: var(--muted); font-weight: 500; }
 
+  /* On a break: something to do with the time, before the reasons. */
+  #idea { margin-top: 4vh; font-size: 4.2vh; line-height: 1.2; font-weight: 800; color: var(--title); text-wrap: balance; max-width: 22em; }
+  #idea:not([hidden]) + #reasons { margin-top: 3vh; --size: 2.8vh; }
+
   /* A photo or a video, stuck on like a print. */
   #media { position: relative; min-height: 0; }
   #media:empty { display: none; }
@@ -70,6 +74,7 @@
     <div class="words">
       <p id="until"></p>
       <p id="left"></p>
+      <p id="idea" hidden></p>
       <p id="reasons"></p>
     </div>
     <div id="media"></div>
@@ -86,7 +91,8 @@
   const t = (key, vars = {}) => (T[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? "");
   const $ = (id) => document.getElementById(id);
 
-  $("title").textContent = t("lock.title");
+  $("title").textContent = t(VIEW.idea ? "lock.rest_title" : "lock.title");
+  if (VIEW.idea) { $("idea").textContent = VIEW.idea; $("idea").hidden = false; }
   const until = new Date(VIEW.until);
   $("until").textContent = t("lock.until", { until: until.toTimeString().slice(0, 5) });
   function countdown() {

@@ -4,7 +4,7 @@
 use std::os::windows::process::CommandExt;
 use std::process::Command;
 
-use chrono::Local;
+use chrono::{Datelike, Duration, Local, NaiveDateTime};
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
@@ -42,6 +42,7 @@ pub fn handle(paths: &Paths, message: &str) -> String {
     let reply = match serde_json::from_str::<Message>(message) {
         Ok(message) => match message.kind.as_str() {
             "state" => json!({ "id": message.id, "state": state(paths) }),
+            "pulse" => json!({ "id": message.id, "pulse": pulse(paths) }),
             "cli" => {
                 let CliReply { ok, text } = run_cli(paths, &message.args);
                 json!({ "id": message.id, "ok": ok, "text": text })
@@ -59,6 +60,24 @@ pub fn handle(paths: &Paths, message: &str) -> String {
 pub fn language(paths: &Paths) -> Lang {
     let config: Config = Store::peek(&paths.config());
     Lang::resolve(config.language.as_deref(), Some(Lang::system().code()))
+}
+
+/// What changes by the second, for the page to keep up with without
+/// redrawing itself whole: what is happening now and what comes next.
+fn pulse(paths: &Paths) -> Value {
+    let config: Config = Store::peek(&paths.config());
+    let state: State = Store::peek(&paths.state());
+    let lang = language(paths);
+    let status = ipc::request(&paths.pipe(), Request::Status).ok().flatten();
+    let paused = status
+        .as_ref()
+        .map(|r| r.message.contains(&tr!(lang, "status.paused", until = "")))
+        .unwrap_or(false);
+    let now = Local::now().naive_local();
+    json!({
+        "headline": headline(&config, &state, status.is_some(), paused, lang),
+        "focus": focus(&config, &state, now, lang),
+    })
 }
 
 /// Everything the page renders, in one piece.
@@ -113,6 +132,7 @@ fn state(paths: &Paths) -> Value {
         "media": media,
         "appearance": config.appearance,
         "headline": headline(&config, &state, daemon, paused, lang),
+        "focus": focus(&config, &state, now, lang),
         "status": status.map(|r| r.message).unwrap_or_default(),
     })
 }
@@ -159,6 +179,8 @@ fn headline(config: &Config, state: &State, daemon: bool, paused: bool, lang: La
                 until = service::when(lang, until)
             ),
         )
+    } else if config.focus.is_some() {
+        ("focus", tr!(lang, "ui.hero.focus"))
     } else {
         ("free", tr!(lang, "ui.hero.free"))
     };
@@ -188,6 +210,57 @@ fn headline(config: &Config, state: &State, daemon: bool, paused: bool, lang: La
         details.push(tr!(lang, "ui.hero.break_in", left = countdown(left)));
     }
     json!({ "kind": kind, "title": title, "details": details })
+}
+
+/// Where the breaks stand: the phase and what is left of it, the round of the
+/// cycle, the focus session, and the history of the last seven days.
+fn focus(config: &Config, state: &State, now: NaiveDateTime, lang: Lang) -> Value {
+    let Some(policy) = config.breaks else {
+        return Value::Null;
+    };
+    let minutes = |m: u32| m as i64 * 60;
+    let (phase, left, total) = match state.on_break(now) {
+        Some(until) if state.break_long => {
+            ("long", until - now, minutes(policy.long_break_minutes))
+        }
+        Some(until) => ("rest", until - now, minutes(policy.break_minutes)),
+        None => (
+            "work",
+            state.break_due_in(config).unwrap_or_default(),
+            minutes(policy.work_minutes),
+        ),
+    };
+    let duration = |secs: u64| countdown(Duration::seconds(secs as i64));
+    let week: Vec<Value> = (0..7)
+        .rev()
+        .map(|back| {
+            let day = now.date() - Duration::days(back);
+            let log = state.history.get(&day).copied().unwrap_or_default();
+            json!({
+                "day": service::day_name(day.weekday(), lang),
+                "minutes": log.work_secs / 60,
+                "work": duration(log.work_secs),
+                "breaks": log.breaks,
+                "today": back == 0,
+            })
+        })
+        .collect();
+    let today = state.history.get(&now.date()).copied().unwrap_or_default();
+    json!({
+        "phase": phase,
+        "left": countdown(left),
+        "left_secs": left.num_seconds().max(0),
+        "total_secs": total,
+        "used": duration(state.usage_secs),
+        "cycle": state.cycle,
+        "cycles": policy.cycles,
+        "has_long": policy.has_long(),
+        "next_long": state.next_is_long(&policy),
+        "session": config.focus.as_ref().map(|f| json!({ "apps": f.apps })),
+        "today": { "work": duration(today.work_secs), "breaks": today.breaks },
+        "week": week,
+        "streak": state.streak(now.date()),
+    })
 }
 
 /// Runs `despegate <args>` and hands back what it printed.
@@ -273,6 +346,7 @@ mod tests {
             media: Vec::new(),
             challenge: None,
             emergency_minutes: 5,
+            idea: None,
         };
         let paths = Paths::new(Some(std::env::temp_dir().join("despegate-ui-test")));
         for html in [

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- What shows before a page has painted: the ground of the settings and of the lock screen. -->
+    <color name="ground">#F1F1F6</color>
+    <color name="screen">#1D1B45</color>
+    <color name="sol">#F5B800</color>
+    <color name="ink">#1D1B45</color>
+</resources>

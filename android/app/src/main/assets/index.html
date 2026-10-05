@@ -1,0 +1,1197 @@
+<!doctype html>
+<html lang="__LANG__" data-theme="__THEME__">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>despegate</title>
+<style>
+  /* Día y noche, as on the desktop: the sticker's yellow marks whatever is
+     happening now, a night indigo is the ink and the blocked time. The app
+     always says which theme to show, so there is no media query here. */
+  @font-face { font-family: Gabarito; font-style: normal; font-weight: 400 900; font-display: block; src: url("/fonts/gabarito-latin.woff2") format("woff2"); }
+  :root {
+    --sol: #f5b800;
+    --ink: #1d1b45;
+    --bg: #f1f1f6;
+    --fg: #1d1b45;
+    --muted: #5d5b80;
+    --line: #d9d9e6;
+    --edge: #b4b4cc;
+    --field: #ffffff;
+    --side: #e7e7f0;
+    --tint: #e4e4ef;
+    --strong: #1d1b45;
+    --on-strong: #f5b800;
+    --active-bg: #1d1b45;
+    --active-fg: #f5b800;
+    --note: #fdf0bd;
+    --ring: rgba(245, 184, 0, 0.55);
+    --shade: rgba(29, 27, 69, 0.45);
+    --ok: #17704a;
+    --bad: #bf3a2b;
+    --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+    --ease-drawer: cubic-bezier(0.32, 0.72, 0, 1);
+    color-scheme: light;
+  }
+  :root[data-theme="dark"] {
+    --bg: #141330; --fg: #eeedfb; --muted: #a6a4cb; --line: #2c2a5c; --edge: #4a4884; --field: #1c1b42; --side: #0f0e28; --tint: #252356;
+    --strong: #f5b800; --on-strong: #1d1b45; --active-bg: #eeedfb; --active-fg: #1d1b45;
+    --note: #1c1b42; --ring: rgba(245, 184, 0, 0.35); --shade: rgba(5, 5, 16, 0.6); --ok: #7fdcae; --bad: #ff9f8c;
+    color-scheme: dark;
+  }
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  [hidden] { display: none !important; }
+  html { background: var(--bg); color: var(--fg); font: 16px/1.5 Gabarito, system-ui, sans-serif; height: 100%; }
+  body { margin: 0; height: 100%; display: grid; grid-template-rows: 1fr auto; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; touch-action: manipulation; }
+  ::selection { background: var(--sol); color: var(--ink); }
+
+  main { overflow-y: auto; overscroll-behavior: contain; }
+  .page { display: none; padding: 26px 18px 40px; max-width: 640px; margin: 0 auto; }
+  .page.current { display: block; }
+
+  /* The pages, along the bottom where the thumb is. */
+  nav { display: grid; grid-template-columns: repeat(5, 1fr); padding: 6px 6px 8px; background: var(--side); }
+  nav a { display: grid; justify-items: center; gap: 2px; padding: 2px 0; color: var(--muted); text-decoration: none; font-size: 12px; font-weight: 600; }
+  nav a svg { width: 56px; height: 30px; padding: 4px 16px; border-radius: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+  nav a.current { color: var(--fg); font-weight: 800; }
+  nav a.current svg { background: var(--sol); color: var(--ink); }
+  /* With the keyboard up there is no room to spare for it. */
+  .typing nav { display: none; }
+
+  h1 { font-size: 32px; line-height: 1.05; letter-spacing: -0.025em; margin: 0 0 20px; font-weight: 800; }
+  h2 { font-size: 22px; line-height: 1.15; letter-spacing: -0.015em; margin: 40px 0 12px; font-weight: 800; }
+  .lead, .hint { margin: -8px 0 20px; color: var(--muted); }
+  h2 + .hint { margin-top: -4px; }
+  a { color: inherit; text-underline-offset: 3px; }
+
+  /* What is happening now, on the sticker from the logo: its corner has let go. */
+  .hero { --cut: 46px; --hero-bg: var(--sol); --hero-fg: var(--ink);
+    position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: center; gap: 8px;
+    min-height: 132px; margin: 0 0 28px; padding: 24px calc(var(--cut) + 12px) 24px 22px; color: var(--hero-fg); }
+  .hero::before { content: ""; position: absolute; inset: 0; z-index: -1; border-radius: 22px; background: var(--hero-bg); transition: background-color 200ms ease;
+    -webkit-mask: linear-gradient(225deg, transparent calc(var(--cut) * 0.7071), #000 calc(var(--cut) * 0.7071 + 0.7px));
+    mask: linear-gradient(225deg, transparent calc(var(--cut) * 0.7071), #000 calc(var(--cut) * 0.7071 + 0.7px)); }
+  .hero .flap { position: absolute; top: 0; right: 0; width: var(--cut); height: var(--cut); fill: var(--hero-bg); transition: fill 200ms ease;
+    transform-origin: 0 100%; transform: translate(calc(var(--cut) * 0.2), calc(var(--cut) * -0.2)) rotate(-12deg);
+    animation: peel 560ms var(--ease-out) 160ms backwards; }
+  @keyframes peel { from { transform: translate(0, 0) rotate(0deg); } }
+  .hero h1 { font-size: clamp(27px, 8vw, 36px); line-height: 1.05; letter-spacing: -0.03em; margin: 0; text-wrap: balance; }
+  .hero p { margin: 0; font-weight: 500; white-space: pre-line; }
+  .hero[data-kind="locked"], .hero[data-kind="blocking"], .hero[data-kind="break"] { --hero-bg: var(--active-bg); --hero-fg: var(--active-fg); }
+  .hero[data-kind="paused"] { --hero-bg: var(--note); --hero-fg: var(--fg); }
+  /* Not running: the sticker is gone and only its place is left. */
+  .hero[data-kind="stopped"] { --hero-fg: var(--fg); }
+  .hero[data-kind="stopped"]::before { background: transparent; border: 2px dashed var(--edge); -webkit-mask: none; mask: none; }
+  .hero[data-kind="stopped"] .flap { display: none; }
+  .starts { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+  .starts[hidden] { display: none; }
+  .hero a.button { background: var(--ink); border-color: var(--ink); color: var(--sol); }
+
+  /* The week: one row per day, hours across, rules painted on it. */
+  .week { display: grid; gap: 8px; margin: 0 0 6px; }
+  .week .row { display: grid; grid-template-columns: 38px 1fr; align-items: center; }
+  .week .day { font-size: 14px; line-height: 1; color: var(--muted); font-weight: 600; }
+  .week .row.today .day { color: var(--fg); font-weight: 800; }
+  .week .track { position: relative; height: 22px; border-radius: 7px; box-shadow: inset 0 0 0 1px var(--line);
+    background: var(--field) repeating-linear-gradient(to right, transparent 0 calc(25% - 1px), var(--line) calc(25% - 1px) 25%); }
+  .week .block { position: absolute; top: 0; bottom: 0; min-width: 3px; border-radius: 6px; background: var(--fg); }
+  .week .block.apps { background: repeating-linear-gradient(135deg, var(--fg) 0 3px, transparent 3px 7px); box-shadow: inset 0 0 0 1.5px var(--fg); }
+  .week .block.oneoff { background: var(--sol); box-shadow: inset 0 0 0 2px var(--fg); }
+  .week .block.oneoff.apps { background: repeating-linear-gradient(135deg, var(--fg) 0 3px, var(--sol) 3px 7px); }
+  .week .now { position: absolute; top: -4px; bottom: -4px; width: 2px; margin-left: -1px; border-radius: 1px; background: var(--fg); box-shadow: 0 0 0 1.5px var(--bg); }
+  .week .now::before { content: ""; position: absolute; top: -7px; left: -4px; width: 10px; height: 10px; border-radius: 50%; background: var(--sol); border: 2px solid var(--fg); box-shadow: 0 0 0 1.5px var(--bg); }
+  .axis { position: relative; height: 18px; margin-left: 38px; }
+  .axis span { position: absolute; transform: translateX(-50%); font-size: 13px; color: var(--muted); white-space: nowrap; }
+  .axis span:first-child { transform: none; }
+  .axis span:last-child { transform: translateX(-100%); }
+  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 10px 0 0 38px; color: var(--muted); font-size: 14px; }
+  .legend span { display: inline-flex; align-items: center; gap: 7px; }
+  .legend span::before { content: ""; width: 18px; height: 11px; border-radius: 4px; }
+  .legend .lock::before { background: var(--fg); }
+  .legend .apps::before { background: repeating-linear-gradient(135deg, var(--fg) 0 3px, transparent 3px 7px); box-shadow: inset 0 0 0 1.5px var(--fg); }
+  .legend .now::before { width: 10px; height: 10px; border-radius: 50%; background: var(--sol); border: 2px solid var(--fg); }
+
+  /* How far the use has got towards the next forced break. */
+  .meter { margin: 0 0 18px; }
+  .meter .bar { height: 16px; border-radius: 8px; background: var(--field); box-shadow: inset 0 0 0 1px var(--line); overflow: hidden; }
+  .meter .fill { height: 100%; border-radius: 8px; background: var(--sol); box-shadow: inset 0 0 0 2px var(--fg); transform-origin: left; transform: scaleX(var(--done, 0)); transition: transform 600ms linear; }
+  .meter.resting .fill { background: var(--fg); }
+  .meter .ends { display: flex; justify-content: space-between; gap: 12px; margin-top: 7px; font-size: 15px; color: var(--muted); }
+  .meter .ends span:first-child { color: var(--fg); font-weight: 700; }
+
+  /* Settings rows: what it is on the left, the control on the right. */
+  .setting { display: grid; grid-template-columns: 1fr auto; gap: 4px 16px; align-items: center; padding: 14px 0; border-top: 1px solid var(--line); }
+  .setting:last-of-type { border-bottom: 1px solid var(--line); }
+  .setting + .setting:last-of-type, .rows .setting { border-bottom: 0; }
+  .rows .setting:last-of-type { border-bottom: 1px solid var(--line); }
+  .setting .title { font-weight: 700; }
+  .setting .desc { color: var(--muted); font-size: 15px; }
+  .setting .control { display: flex; align-items: center; gap: 8px; justify-self: end; }
+  .setting .note { grid-column: 1 / -1; font-size: 15px; color: var(--muted); }
+  .setting .note:empty { display: none; }
+  .setting.off .text { opacity: 0.5; }
+
+  label, .label { display: block; color: var(--muted); font-size: 14px; margin-bottom: 5px; font-weight: 600; }
+  input, textarea, select {
+    font: inherit; color: var(--fg); background: var(--field);
+    border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px; width: 100%; min-height: 46px;
+    transition: border-color 150ms ease, box-shadow 150ms ease;
+  }
+  input:focus, textarea:focus, select:focus { outline: none; border-color: var(--strong); box-shadow: 0 0 0 3px var(--ring); }
+  :is(button, a, summary):focus-visible { outline: 3px solid var(--strong); outline-offset: 2px; }
+  input:disabled, select:disabled { opacity: 0.5; }
+  textarea { min-height: 110px; resize: none; display: block; }
+  input[type="number"] { width: 84px; text-align: right; }
+  .unit { color: var(--muted); font-size: 15px; }
+  /* A time of day asked for with am and pm: hour, minutes, and which half of the day. */
+  .time12 { display: flex; align-items: center; gap: 6px; font-weight: 700; }
+  .time12 select { width: 74px; min-width: 0; text-align: center; }
+  .ampm { display: flex; margin-left: 6px; border: 1.5px solid var(--edge); border-radius: 12px; overflow: hidden; }
+  .ampm button { border: 0; border-radius: 0; background: transparent; color: var(--muted); padding: 0 16px; min-height: 43px; font-weight: 600; }
+  .ampm button.on { background: var(--fg); color: var(--bg); font-weight: 700; }
+  select { appearance: none; padding-right: 34px; width: auto; min-width: 150px;
+    background-image: linear-gradient(45deg, transparent 50%, var(--muted) 50%), linear-gradient(135deg, var(--muted) 50%, transparent 50%);
+    background-position: calc(100% - 18px) 55%, calc(100% - 13px) 55%; background-size: 5px 5px; background-repeat: no-repeat; }
+
+  /* A switch, drawn over a checkbox. */
+  .switch { position: relative; display: inline-block; width: 50px; height: 30px; flex: none; }
+  .switch input { position: absolute; opacity: 0; width: 100%; height: 100%; min-height: 0; margin: 0; z-index: 1; }
+  .switch span { position: absolute; inset: 0; background: var(--edge); border-radius: 15px; transition: background-color 160ms ease; }
+  .switch span::after { content: ""; position: absolute; top: 3px; left: 3px; width: 24px; height: 24px; border-radius: 50%; background: var(--field); transition: transform 160ms var(--ease-out), background-color 160ms ease; }
+  .switch input:checked + span { background: var(--strong); }
+  .switch input:checked + span::after { transform: translateX(20px); background: var(--on-strong); }
+  .check { display: inline-flex; align-items: center; gap: 10px; color: var(--fg); font-size: 16px; margin: 0; min-height: 46px; }
+  .pill { display: inline-block; font-size: 13px; font-weight: 700; color: var(--ink); background: var(--sol); border-radius: 999px; padding: 1px 10px; vertical-align: 2px; }
+
+  a.button { display: inline-flex; align-items: center; text-decoration: none; }
+  button, a.button { font: inherit; font-weight: 700; color: var(--fg); background: var(--field); border: 1.5px solid var(--line); border-radius: 12px; padding: 8px 18px; min-height: 46px;
+    transition: transform 140ms var(--ease-out), background-color 150ms ease, border-color 150ms ease; }
+  button:active:not(:disabled), a.button:active { transform: scale(0.97); }
+  button.primary { background: var(--strong); border-color: var(--strong); color: var(--on-strong); }
+  button.danger { background: var(--bad); border-color: var(--bad); color: var(--bg); }
+  button.small { padding: 4px 14px; min-height: 36px; font-size: 15px; }
+  button.quiet { border-color: transparent; background: transparent; color: var(--muted); padding: 6px 10px; font-weight: 600; }
+  button:disabled { opacity: 0.5; }
+
+  .fields { display: grid; grid-template-columns: 1fr 1fr; gap: 14px 12px; margin-bottom: 14px; }
+  .fields .wide { grid-column: 1 / -1; }
+  .inline { display: flex; align-items: center; gap: 8px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px 16px; align-items: center; margin-top: 6px; }
+  .chips { display: grid; grid-template-columns: repeat(7, 1fr); gap: 4px; }
+  /* The days a rule takes are painted like the hours it takes in the week. */
+  .chips button { border-radius: 999px; padding: 4px 0; min-height: 42px; color: var(--muted); font-weight: 600; font-size: 15px; background: transparent; border-color: var(--edge); }
+  .chips button.on { color: var(--bg); background: var(--fg); border-color: var(--fg); font-weight: 700; }
+  .presets { display: flex; flex-wrap: wrap; gap: 4px; }
+  .presets button { padding: 3px 12px; min-height: 38px; font-size: 15px; font-weight: 600; color: var(--muted); background: transparent; border-radius: 999px; }
+  .presets button.on { color: var(--fg); border-color: var(--fg); }
+  #day-presets { margin-top: 8px; }
+
+  /* The apps a block takes or a lock lets through: tap to choose them. */
+  .apps-field { display: flex; align-items: center; gap: 8px; width: 100%; padding: 6px 12px; text-align: left; font-weight: 500; }
+  .apps-field img, .list img, .app-row img { width: 28px; height: 28px; flex: none; border-radius: 7px; }
+  .apps-field .names { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .apps-field .none { color: var(--muted); }
+  .apps-field .more { color: var(--muted); font-weight: 700; font-size: 15px; }
+  .apps-field::after { content: ""; width: 8px; height: 8px; flex: none; border-right: 2px solid var(--muted); border-bottom: 2px solid var(--muted); transform: rotate(-45deg); }
+
+  .list { margin: 0; padding: 0; list-style: none; }
+  .list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--line); }
+  .list li:last-child { border-bottom: 1px solid var(--line); }
+  .list .name { font-weight: 700; display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  .list .desc { color: var(--muted); grid-column: 1; }
+  .list .side { grid-column: 2; grid-row: 1 / span 2; }
+  .confirm { display: inline-flex; gap: 6px; align-items: center; color: var(--muted); font-size: 15px; }
+  .confirm[hidden], button[hidden] { display: none; }
+  .list li.empty { color: var(--muted); display: block; }
+
+  /* What opens a form: a button with a plus that turns into a cross. */
+  details { margin-top: 12px; }
+  summary { display: inline-flex; align-items: center; gap: 9px; font-weight: 700; list-style: none; user-select: none; min-height: 46px;
+    padding: 8px 18px 8px 14px; border: 1.5px solid var(--line); border-radius: 12px; background: var(--field); }
+  summary::-webkit-details-marker { display: none; }
+  summary::before { content: ""; width: 12px; height: 12px; flex: none; transition: transform 200ms var(--ease-out);
+    background: linear-gradient(currentColor, currentColor) center / 100% 2px no-repeat, linear-gradient(currentColor, currentColor) center / 2px 100% no-repeat; }
+  details[open] > summary::before { transform: rotate(45deg); }
+  details > div, .tool { margin-top: 12px; padding: 18px; background: var(--field); border: 1.5px solid var(--line); border-radius: 18px; }
+  .tool { margin-top: 32px; }
+  .tool h2 { margin: 0 0 14px; }
+  :is(.tool, details > div, .sheet) :is(input, textarea, select, .apps-field) { background-color: var(--bg); }
+  :is(.tool, details) form .feedback:empty { display: none; }
+
+  .feedback { margin: 10px 0 0; color: var(--muted); white-space: pre-wrap; min-height: 1.5em; font-size: 15px; }
+  .preview { color: var(--muted); margin: 0 0 12px; font-size: 15px; min-height: 1.5em; }
+  .preview.warn, .feedback.error, .note.error { color: var(--bad); }
+  .feedback.ok, .note.ok { color: var(--ok); }
+  .about { color: var(--muted); font-size: 15px; margin-top: 36px; display: flex; flex-wrap: wrap; gap: 4px 20px; }
+
+  /* Something that needs doing before despegate can work. */
+  .notice { margin: 0 0 20px; padding: 14px 16px; border: 2px dashed var(--edge); border-radius: 16px; }
+  .notice[hidden] { display: none; }
+  .notice p { margin: 0 0 10px; }
+  .notice p:last-child { margin-bottom: 0; }
+  .notice code { display: block; margin: 0 0 10px; padding: 10px 12px; font: 13px/1.5 monospace; background: var(--field); border-radius: 10px; word-break: break-all; user-select: all; }
+  .notice.done { border-style: solid; border-color: var(--line); color: var(--muted); }
+  /* The other way of setting up, for whoever wants it: folded away, without the weight of a button. */
+  details.plain { margin: -8px 0 20px; }
+  details.plain summary { min-height: 0; padding: 4px 0; border: 0; background: none; color: var(--muted); font-weight: 600; font-size: 15px; }
+  details.plain > div { margin-top: 8px; padding: 14px 16px; background: none; color: var(--muted); }
+  details.plain code { display: block; margin-top: 10px; padding: 10px 12px; font: 13px/1.5 monospace; background: var(--field); border-radius: 10px; word-break: break-all; user-select: all; }
+  details.plain p { margin: 0; }
+
+  /* The reasons are a note to oneself, and look like one. */
+  #reasons-text { min-height: 180px; padding: 18px; font-size: 18px; font-weight: 500; background: var(--note); border-color: transparent; border-radius: 14px; }
+  #reasons-text:focus { border-color: var(--strong); }
+  #reasons-form .actions { margin-top: 14px; }
+  .gallery { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin: 24px 0 12px; }
+  .gallery:empty { display: none; }
+  .gallery figure { margin: 0; position: relative; aspect-ratio: 4 / 3; background: var(--field); border-radius: 12px; overflow: hidden; }
+  .gallery img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  /* A video is told apart by the play mark over its frame. */
+  .gallery figure.video::before { content: ""; position: absolute; inset: 0; margin: auto; width: 44px; height: 44px; border-radius: 50%; background: rgba(20, 19, 48, 0.62); }
+  .gallery figure.video::after { content: ""; position: absolute; inset: 0; margin: auto; width: 0; height: 0; border-style: solid; border-width: 9px 0 9px 15px; border-color: transparent transparent transparent #fff; transform: translateX(2px); }
+  .gallery figcaption { position: absolute; left: 0; right: 0; bottom: 0; padding: 18px 4px 4px 10px; background: linear-gradient(to top, rgba(20, 19, 48, 0.82), rgba(20, 19, 48, 0)); color: #fff; font-size: 13px; display: flex; justify-content: space-between; align-items: center; gap: 6px; }
+  .gallery figcaption span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .gallery figcaption button { color: #fff; padding: 2px 8px; min-height: 32px; font-size: 13px; }
+  .gallery figcaption button.small { color: var(--ink); background: #fff; border-color: #fff; min-height: 28px; }
+  .gallery figcaption button.small.primary { background: var(--sol); border-color: var(--sol); }
+  .gallery .confirm { color: #fff; font-size: 13px; gap: 4px; }
+  .gallery.thumbs { grid-template-columns: repeat(3, 1fr); margin: 12px 0; }
+
+  .allowed { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 14px; padding: 0; list-style: none; }
+  .allowed li { display: flex; align-items: center; gap: 8px; padding: 6px 12px 6px 6px; background: var(--field); border-radius: 999px; font-weight: 600; font-size: 15px; }
+  .allowed li.empty { background: none; padding: 0; color: var(--muted); font-weight: 400; }
+  .allowed img { width: 28px; height: 28px; border-radius: 50%; }
+
+  /* A sheet that comes up from the bottom, over a shade. */
+  .sheet { position: fixed; inset: 0; z-index: 10; display: flex; align-items: flex-end; background: var(--shade); transition: opacity 220ms ease; }
+  .sheet[hidden] { display: none; }
+  .sheet > div { width: 100%; max-height: 88%; display: flex; flex-direction: column; background: var(--field); border-radius: 22px 22px 0 0; padding: 18px 18px 14px; transition: transform 300ms var(--ease-drawer); }
+  @starting-style { .sheet { opacity: 0; } .sheet > div { transform: translateY(100%); } }
+  .sheet h2 { margin: 0 0 12px; }
+  .sheet .scroll { overflow-y: auto; min-height: 0; margin: 12px -18px 0; padding: 0 18px; }
+  .sheet .foot { display: flex; gap: 10px; padding-top: 12px; }
+  .sheet .foot button { flex: 1; }
+  .app-row { display: flex; align-items: center; gap: 12px; min-height: 52px; margin: 0; color: var(--fg); font-size: 16px; font-weight: 500; }
+  .app-row span { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .app-row input { width: 24px; height: 24px; min-height: 0; padding: 0; accent-color: var(--strong); }
+  #leave blockquote { margin: 0 0 12px; padding: 14px 16px; background: var(--note); border-radius: 12px; font-weight: 500; white-space: pre-line; }
+  #leave p { margin: 0 0 10px; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .hero .flap { animation: none; }
+    .switch span::after, summary::before, button, a.button, .sheet, .sheet > div { transition: none; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <section class="page" id="home">
+    <div class="hero" id="hero" data-kind="free">
+      <svg class="flap" viewBox="0 0 86 86" aria-hidden="true"><path d="M8 0H78a8 8 0 0 1 8 8V78a8 8 0 0 1-8 8L0 8A8 8 0 0 1 8 0Z"/></svg>
+      <h1 id="hero-title">&nbsp;</h1>
+      <p id="hero-details"></p>
+      <div class="starts" id="starts" hidden>
+        <a class="button" href="#reasons" id="start-reasons" data-t="ui.hero.start_reasons"></a>
+        <a class="button" href="#rules" data-t="ui.hero.start_rule"></a>
+      </div>
+    </div>
+    <div class="week" id="week"></div>
+    <div class="axis" id="axis"></div>
+    <div class="legend">
+      <span class="lock" data-t="ui.week.lock"></span>
+      <span class="apps" data-t="ui.week.apps"></span>
+      <span class="now" data-t="ui.week.now"></span>
+    </div>
+
+    <div class="tool">
+      <h2 data-t="ui.now.heading"></h2>
+      <form id="now-form">
+        <label data-t="ui.minutes_long" for="now-minutes"></label>
+        <div class="inline"><input id="now-minutes" name="minutes" type="number" inputmode="numeric" min="1" max="1440" value="45" required>
+          <div class="presets" id="minute-presets"></div></div>
+        <div class="label" style="margin-top: 14px" data-t="ui.apps"></div>
+        <button type="button" class="apps-field" id="now-apps"></button>
+        <div class="actions">
+          <label class="check"><span class="switch"><input name="lock" type="checkbox" checked><span></span></span><span data-t="ui.lock"></span></label>
+          <button type="submit" class="primary" data-t="ui.now.start"></button>
+          <span class="confirm" hidden></span>
+        </div>
+        <p class="feedback" aria-live="polite"></p>
+      </form>
+    </div>
+  </section>
+
+  <section class="page" id="rules">
+    <h1 data-t="ui.rules.heading"></h1>
+    <ul class="list" id="rules-list"></ul>
+    <p class="feedback" id="rules-feedback" aria-live="polite"></p>
+    <details id="rule-details">
+      <summary data-t="ui.rules.new"></summary>
+      <div>
+        <form id="rule-form">
+          <div class="fields">
+            <div class="wide"><label data-t="ui.rules.name" for="rule-name"></label><input id="rule-name" name="name" required></div>
+            <div><label data-t="ui.rules.from" for="rule-from"></label><input id="rule-from" name="from" type="time" required></div>
+            <div><label data-t="ui.rules.to" for="rule-to"></label><input id="rule-to" name="to" type="time" required></div>
+            <div class="wide"><div class="label" id="rule-days-label" data-t="ui.rules.days"></div><div class="chips" id="rule-days" role="group" aria-labelledby="rule-days-label"></div>
+              <div class="presets" id="day-presets"></div></div>
+            <div class="wide"><div class="label" data-t="ui.apps"></div><button type="button" class="apps-field" id="rule-apps"></button></div>
+          </div>
+          <p class="preview" id="rule-preview" aria-live="polite"></p>
+          <div class="actions">
+            <label class="check"><span class="switch"><input name="lock" type="checkbox" checked><span></span></span><span data-t="ui.lock"></span></label>
+            <button type="submit" class="primary" data-t="ui.add"></button>
+          </div>
+          <p class="feedback" aria-live="polite"></p>
+        </form>
+      </div>
+    </details>
+  </section>
+
+  <section class="page" id="limits">
+    <h1 data-t="ui.allowances.heading"></h1>
+    <div class="notice" id="usage-notice" hidden>
+      <p data-t="ui.allowances.usage"></p>
+      <button type="button" class="small" id="usage-grant" data-t="ui.allowances.usage_grant"></button>
+    </div>
+    <ul class="list" id="allowances-list"></ul>
+    <p class="feedback" id="allowances-feedback" aria-live="polite"></p>
+    <details id="allowance-details">
+      <summary data-t="ui.allowances.new"></summary>
+      <div>
+        <form id="allowance-form">
+          <div class="label" data-t="ui.allowances.app"></div>
+          <button type="button" class="apps-field" id="allowance-app"></button>
+          <label style="margin-top: 14px" data-t="ui.allowances.minutes" for="allowance-minutes"></label>
+          <div class="actions" style="margin-top: 0">
+            <input id="allowance-minutes" name="minutes" type="number" inputmode="numeric" min="1" max="1440" value="60" required>
+            <button type="submit" class="primary" data-t="ui.add"></button>
+          </div>
+          <p class="feedback" aria-live="polite"></p>
+        </form>
+      </div>
+    </details>
+
+    <h2 data-t="ui.breaks.heading"></h2>
+    <p class="hint" data-t="ui.breaks.hint"></p>
+    <div class="meter" id="break-meter" hidden>
+      <div class="bar"><div class="fill"></div></div>
+      <div class="ends"><span id="break-used"></span><span id="break-left"></span></div>
+    </div>
+    <div class="rows">
+      <div class="setting" id="breaks-toggle-row">
+        <div class="text"><div class="title" id="breaks-toggle-title" data-t="ui.breaks.toggle"></div></div>
+        <div class="control"><label class="switch"><input type="checkbox" id="breaks-on" aria-labelledby="breaks-toggle-title"><span></span></label></div>
+        <div class="note" id="breaks-note"></div>
+      </div>
+      <div class="setting" id="breaks-every-row">
+        <div class="text"><div class="title" id="breaks-every-title" data-t="ui.breaks.every"></div></div>
+        <div class="control"><input type="number" inputmode="numeric" id="breaks-every" min="5" max="480" value="50" aria-labelledby="breaks-every-title"><span class="unit" data-t="ui.minutes"></span></div>
+      </div>
+      <div class="setting" id="breaks-rest-row">
+        <div class="text"><div class="title" id="breaks-rest-title" data-t="ui.breaks.rest"></div></div>
+        <div class="control"><input type="number" inputmode="numeric" id="breaks-rest" min="1" max="120" value="10" aria-labelledby="breaks-rest-title"><span class="unit" data-t="ui.minutes"></span></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="page" id="reasons">
+    <h1 id="reasons-heading" data-t="ui.reasons.heading"></h1>
+    <p class="lead" data-t="ui.reasons.hint"></p>
+    <form id="reasons-form">
+      <textarea id="reasons-text" aria-labelledby="reasons-heading"></textarea>
+      <div class="actions"><button type="submit" class="primary" data-t="ui.save"></button><button type="button" id="pick" data-t="ui.reasons.add"></button></div>
+      <p class="feedback" aria-live="polite"></p>
+    </form>
+    <div class="gallery" id="gallery"></div>
+    <p class="feedback" id="media-feedback" aria-live="polite"></p>
+  </section>
+
+  <section class="page" id="settings">
+    <h1 data-t="ui.settings.heading"></h1>
+    <div class="notice" id="setup">
+      <p id="setup-text"></p>
+      <button type="button" class="small primary" id="setup-watch" data-t="ui.setup.watch_grant" hidden></button>
+      <p id="setup-weak" data-t="ui.setup.watch_weak" hidden></p>
+      <p id="setup-removable" data-t="ui.setup.removable" hidden></p>
+    </div>
+    <div class="notice" id="setup-battery" hidden>
+      <p data-t="ui.setup.battery"></p>
+      <button type="button" class="small" id="setup-battery-grant" data-t="ui.setup.battery_grant"></button>
+    </div>
+    <details class="plain" id="setup-owner" hidden>
+      <summary data-t="ui.setup.heading"></summary>
+      <div><p data-t="ui.setup.owner_no"></p><code id="setup-command"></code></div>
+    </details>
+
+    <h2 style="margin-top: 0" data-t="ui.allowed.heading"></h2>
+    <p class="hint" data-t="ui.allowed.hint"></p>
+    <ul class="allowed" id="allowed-list"></ul>
+    <button type="button" id="allowed-edit" data-t="ui.allowed.edit"></button>
+    <p class="feedback" id="allowed-feedback" aria-live="polite"></p>
+
+    <div class="rows" id="settings-rows"></div>
+    <div class="rows">
+      <div class="setting">
+        <div class="text"><div class="title" id="appearance-title" data-t="ui.settings.appearance"></div></div>
+        <div class="control"><select id="appearance" aria-labelledby="appearance-title">
+          <option value="system" data-t="ui.settings.appearance_system"></option>
+          <option value="light" data-t="ui.settings.appearance_light"></option>
+          <option value="dark" data-t="ui.settings.appearance_dark"></option>
+        </select></div>
+        <div class="note" id="appearance-note"></div>
+      </div>
+      <div class="setting">
+        <div class="text"><div class="title" id="clock-title" data-t="ui.settings.clock"></div></div>
+        <div class="control"><select id="clock" aria-labelledby="clock-title">
+          <option value="system" data-t="ui.settings.auto"></option>
+          <option value="12" data-t="ui.settings.clock_12"></option>
+          <option value="24" data-t="ui.settings.clock_24"></option>
+        </select></div>
+        <div class="note" id="clock-note"></div>
+      </div>
+      <div class="setting">
+        <div class="text"><div class="title" id="language-title" data-t="ui.settings.language"></div></div>
+        <div class="control"><select id="language" aria-labelledby="language-title"></select></div>
+        <div class="note" id="language-note"></div>
+      </div>
+    </div>
+
+    <h2 data-t="uninstall.heading"></h2>
+    <p class="hint" data-t="uninstall.hint"></p>
+    <button type="button" id="leave-open" data-t="uninstall.button"></button>
+    <p class="about"><span data-t="ui.about.version"></span><a href="https://github.com/CoKeFish/despegate#readme" data-t="ui.about.help"></a></p>
+  </section>
+</main>
+
+<nav id="nav"></nav>
+
+<div class="sheet" id="picker" hidden>
+  <div>
+    <input type="search" id="picker-search" autocomplete="off">
+    <div class="scroll" id="picker-list"></div>
+    <div class="foot"><button type="button" class="primary" id="picker-done" data-t="ui.picker.done"></button></div>
+  </div>
+</div>
+
+<div class="sheet" id="leave" hidden>
+  <div>
+    <h2 data-t="uninstall.heading"></h2>
+    <div class="scroll" style="margin-top: 0">
+      <p data-t="uninstall.about"></p>
+      <p id="leave-why"></p>
+      <blockquote id="leave-reasons"></blockquote>
+      <div class="gallery thumbs" id="leave-media"></div>
+      <label for="leave-phrase" id="leave-prompt"></label>
+      <input id="leave-phrase" autocomplete="off" autocapitalize="none" spellcheck="false">
+      <p class="feedback" id="leave-feedback" aria-live="polite"></p>
+    </div>
+    <div class="foot"><button type="button" id="leave-stay" data-t="uninstall.cancel"></button><button type="button" class="danger" id="leave-go" data-t="uninstall.button"></button></div>
+  </div>
+</div>
+
+<script>
+  const T = __I18N__;
+  const t = (key, vars = {}) => (T[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? `{${name}}`);
+  const $ = (selector, root = document) => root.querySelector(selector);
+  const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  const PAGES = ["home", "rules", "limits", "reasons", "settings"];
+  const ICONS = {
+    home: '<path d="M4 7h16M4 12h10M4 17h13"/>',
+    rules: '<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+    limits: '<path d="M7.5 4h9v3l-4.5 5 4.5 5v3h-9v-3l4.5-5-4.5-5z"/>',
+    reasons: '<path d="M5 5h9l5 5v9H5zM14 5v5h5"/>',
+    settings: '<path d="M4 8h9M19 8h1M4 16h1M11 16h9"/><circle cx="16" cy="8" r="2.5"/><circle cx="8" cy="16" r="2.5"/>',
+  };
+
+  for (const el of document.querySelectorAll("[data-t]")) el.textContent = t(el.dataset.t, { version: "__VERSION__" });
+
+  // Requests to the app are answered through window.__reply.
+  const pending = new Map();
+  let seq = 0;
+  function ask(message) {
+    return new Promise((resolve) => {
+      const id = ++seq;
+      pending.set(id, resolve);
+      window.ipc.postMessage(JSON.stringify({ id, ...message }));
+    });
+  }
+  window.__reply = (reply) => {
+    const resolve = pending.get(reply.id);
+    pending.delete(reply.id);
+    if (resolve) resolve(reply);
+  };
+  const tell = (message) => window.ipc.postMessage(JSON.stringify(message));
+  const request = (cmd, fields = {}) => ask({ kind: "do", request: { cmd, ...fields } });
+
+  // The system bars are painted like the page.
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  tell({ kind: "theme", dark: document.documentElement.dataset.theme === "dark", bar: css("--side") });
+
+  // Success notices fade on their own; errors stay until the next action.
+  const timers = new WeakMap();
+  function show(el, text, ok) {
+    el.textContent = text;
+    el.classList.toggle("error", ok === false);
+    el.classList.toggle("ok", ok === true);
+    clearTimeout(timers.get(el));
+    if (ok === true) timers.set(el, setTimeout(() => { if (el.textContent === text) el.textContent = ""; }, 5000));
+  }
+
+  // Sends one request for a form, shows what it answered, then redraws.
+  async function act(form, cmd, fields, feedback = $(".feedback", form)) {
+    const buttons = form ? form.querySelectorAll("button") : [];
+    buttons.forEach((b) => (b.disabled = true));
+    const reply = await request(cmd, fields);
+    show(feedback, reply.text, reply.ok);
+    buttons.forEach((b) => (b.disabled = false));
+    await refresh();
+    return reply;
+  }
+
+  // With the keyboard up the page needs all the room there is. The keyboard is
+  // what makes the window shorter than it has been.
+  let tallest = innerHeight;
+  addEventListener("resize", () => {
+    tallest = Math.max(tallest, innerHeight);
+    document.body.classList.toggle("typing", innerHeight < tallest - 120);
+  });
+
+  // --- apps: known by their names, chosen from a sheet
+  let labels = {};
+  const label = (pkg) => labels[pkg] ?? pkg;
+  const names = (pkgs) => pkgs.map(label).join(", ");
+  function icon(pkg) {
+    const img = document.createElement("img");
+    img.src = `/icon/${pkg}`;
+    img.alt = "";
+    return img;
+  }
+
+  // --- sheets, and what Back closes
+  const sheets = [];
+  function openSheet(el, onClose) {
+    el.hidden = false;
+    sheets.push({ el, onClose });
+  }
+  function closeSheet() {
+    const top = sheets.pop();
+    if (!top) return false;
+    top.el.hidden = true;
+    if (top.onClose) top.onClose();
+    return true;
+  }
+  for (const el of document.querySelectorAll(".sheet")) el.addEventListener("click", (e) => { if (e.target === el) closeSheet(); });
+  window.__back = () => {
+    if (closeSheet()) return true;
+    if (location.hash && location.hash !== "#home") { location.hash = "#home"; return true; }
+    return false;
+  };
+
+  let installed = null;
+  const plain = (text) => text.normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase();
+  // Opens the list of apps; resolves to the chosen packages, or to null when it is closed without choosing.
+  async function pickApps(selected, multiple) {
+    if (!installed) {
+      installed = (await ask({ kind: "apps" })).apps;
+      for (const app of installed) labels[app.pkg] = app.label;
+    }
+    return new Promise((resolve) => {
+      const chosen = new Set(selected);
+      const list = $("#picker-list"), search = $("#picker-search"), done = $("#picker-done");
+      let result = null;
+      const draw = () => {
+        const query = plain(search.value);
+        list.replaceChildren();
+        for (const app of installed) {
+          if (query && !plain(app.label).includes(query)) continue;
+          const row = document.createElement("label");
+          row.className = "app-row";
+          const name = document.createElement("span");
+          name.textContent = app.label;
+          const box = document.createElement("input");
+          box.type = multiple ? "checkbox" : "radio";
+          box.name = "picked";
+          box.checked = chosen.has(app.pkg);
+          box.onchange = () => {
+            if (!multiple) { result = [app.pkg]; closeSheet(); return; }
+            box.checked ? chosen.add(app.pkg) : chosen.delete(app.pkg);
+          };
+          row.append(icon(app.pkg), name, box);
+          list.append(row);
+        }
+        if (!list.children.length) list.textContent = t("ui.picker.empty");
+      };
+      search.value = "";
+      search.placeholder = t("ui.picker.search");
+      search.oninput = draw;
+      done.hidden = !multiple;
+      done.onclick = () => { result = [...chosen]; closeSheet(); };
+      draw();
+      openSheet($("#picker"), () => resolve(result));
+    });
+  }
+
+  // A field that holds a choice of apps and opens the sheet when tapped.
+  function appsField(el, multiple = true) {
+    let chosen = [];
+    const draw = () => {
+      el.replaceChildren();
+      const text = document.createElement("span");
+      text.className = "names";
+      if (!chosen.length) { text.textContent = t(multiple ? "ui.apps_none" : "ui.allowances.pick"); text.classList.add("none"); }
+      else text.textContent = chosen.length <= 2 ? names(chosen) : t("ui.apps_count", { count: chosen.length });
+      el.append(...chosen.slice(0, 4).map(icon), text);
+    };
+    el.onclick = async () => {
+      const picked = await pickApps(chosen, multiple);
+      if (!picked) return;
+      chosen = picked;
+      draw();
+      el.dispatchEvent(new Event("change", { bubbles: true }));
+    };
+    draw();
+    return { get value() { return chosen; }, set: (pkgs) => { chosen = [...pkgs]; draw(); } };
+  }
+  const nowApps = appsField($("#now-apps"));
+  const ruleApps = appsField($("#rule-apps"));
+  const allowanceApp = appsField($("#allowance-app"), false);
+
+  // --- pages
+  const nav = $("#nav");
+  for (const page of PAGES) {
+    const a = document.createElement("a");
+    a.href = `#${page}`;
+    a.innerHTML = `<svg viewBox="0 0 24 24" aria-hidden="true">${ICONS[page]}</svg>`;
+    a.append(t(`ui.nav.${page}`));
+    nav.append(a);
+  }
+  function showPage() {
+    const page = PAGES.includes(location.hash.slice(1)) ? location.hash.slice(1) : PAGES[0];
+    for (const section of document.querySelectorAll(".page")) section.classList.toggle("current", section.id === page);
+    for (const a of nav.children) {
+      const current = a.getAttribute("href") === `#${page}`;
+      a.classList.toggle("current", current);
+      if (current) a.setAttribute("aria-current", "page"); else a.removeAttribute("aria-current");
+    }
+    $("main").scrollTop = 0;
+  }
+  window.addEventListener("hashchange", showPage);
+  showPage();
+
+  // --- the week
+  const minutes = (hhmmss) => { const [h, m] = hhmmss.split(":").map(Number); return h * 60 + m; };
+  const pct = (mins) => `${(mins / 1440) * 100}%`;
+  // Times of day are written the way the phone is set to: with am and pm, or around the clock.
+  let hour12 = null;
+  const clock = (hhmm) => {
+    if (!hour12 || !hhmm) return hhmm;
+    const [h, m] = hhmm.split(":").map(Number);
+    return `${h % 12 || 12}:${String(m).padStart(2, "0")} ${h < 12 ? "am" : "pm"}`;
+  };
+  // With am and pm, the time picker of the phone may still ask around the clock. These
+  // fields ask the way the app writes, and keep the real field underneath filled in.
+  function timeField(input, fallback) {
+    const box = document.createElement("div");
+    box.className = "time12";
+    box.hidden = true;
+    const hour = document.createElement("select"), minute = document.createElement("select"), half = document.createElement("div");
+    for (let h = 1; h <= 12; h++) hour.append(new Option(h, h));
+    for (let m = 0; m < 60; m += 5) minute.append(new Option(String(m).padStart(2, "0"), m));
+    half.className = "ampm";
+    const halves = ["am", "pm"].map((name) => {
+      const b = document.createElement("button");
+      b.type = "button";
+      b.textContent = name;
+      b.onclick = () => { setHalf(name === "pm"); write(); };
+      half.append(b);
+      return b;
+    });
+    const setHalf = (pm) => halves.forEach((b, i) => { b.classList.toggle("on", (i === 1) === pm); b.setAttribute("aria-pressed", (i === 1) === pm); });
+    const write = () => {
+      const h = (Number(hour.value) % 12) + (halves[1].classList.contains("on") ? 12 : 0);
+      input.value = `${String(h).padStart(2, "0")}:${String(minute.value).padStart(2, "0")}`;
+      input.dispatchEvent(new Event("input", { bubbles: true }));
+    };
+    const read = (value) => {
+      const [h, m] = (value || fallback).split(":").map(Number);
+      hour.value = h % 12 || 12;
+      minute.value = m - (m % 5);
+      setHalf(h >= 12);
+    };
+    hour.onchange = write;
+    minute.onchange = write;
+    hour.setAttribute("aria-label", input.labels[0]?.textContent ?? "");
+    box.append(hour, ":", minute, half);
+    input.after(box);
+    return {
+      show(on) {
+        box.hidden = !on;
+        input.hidden = on;
+        input.parentElement.classList.toggle("wide", on);
+        if (on) { read(input.value); write(); }
+      },
+      reset() { if (!box.hidden) { read(""); write(); } },
+    };
+  }
+  const timeFields = [timeField($("#rule-from"), "22:00"), timeField($("#rule-to"), "07:00")];
+
+  function paintAxis() {
+    const axis = $("#axis");
+    axis.replaceChildren();
+    for (const hour of [0, 6, 12, 18, 24]) {
+      const s = document.createElement("span");
+      s.style.left = pct(hour * 60);
+      s.textContent = hour12 ? `${hour % 12 || 12} ${hour % 24 < 12 ? "am" : "pm"}` : hour;
+      axis.append(s);
+    }
+  }
+  function paintWeek(config) {
+    const week = $("#week");
+    week.replaceChildren();
+    const now = new Date();
+    const today = (now.getDay() + 6) % 7; // Monday first
+    const tracks = DAYS.map((day, i) => {
+      const row = document.createElement("div");
+      row.className = "row" + (i === today ? " today" : "");
+      const name = document.createElement("span");
+      name.className = "day";
+      name.textContent = t(`day.${day.toLowerCase()}`);
+      const track = document.createElement("div");
+      track.className = "track";
+      row.append(name, track);
+      week.append(row);
+      return track;
+    });
+    const paint = (dayIndex, from, to, cls) => {
+      if (to <= from) return;
+      const block = document.createElement("div");
+      block.className = `block ${cls}`;
+      block.style.left = pct(from);
+      block.style.width = pct(to - from);
+      tracks[dayIndex].append(block);
+    };
+    for (const rule of config.rules) {
+      const start = minutes(rule.start), end = minutes(rule.end);
+      const cls = rule.lock ? "lock" : "apps";
+      for (const day of rule.days) {
+        const i = DAYS.indexOf(day);
+        if (end > start) paint(i, start, end, cls);
+        else { paint(i, start, 1440, cls); paint((i + 1) % 7, 0, end, cls); }
+      }
+    }
+    const nowMinutes = now.getHours() * 60 + now.getMinutes();
+    for (const block of config.oneoffs) {
+      const until = new Date(block.until);
+      const sameDay = until.toDateString() === now.toDateString();
+      const end = sameDay ? until.getHours() * 60 + until.getMinutes() : 1440;
+      paint(today, nowMinutes, end, (block.lock ? "lock" : "apps") + " oneoff");
+    }
+    const marker = document.createElement("div");
+    marker.className = "now";
+    marker.style.left = pct(nowMinutes);
+    tracks[today].append(marker);
+  }
+
+  // --- a two-step confirmation for what cannot be undone
+  function confirmThen(button, question, run) {
+    const holder = button.parentElement.querySelector(".confirm");
+    holder.hidden = false;
+    holder.replaceChildren();
+    const q = document.createElement("span");
+    q.textContent = question;
+    const yes = document.createElement("button");
+    yes.type = "button"; yes.className = "small primary"; yes.textContent = t("ui.confirm.yes");
+    const no = document.createElement("button");
+    no.type = "button"; no.className = "small"; no.textContent = t("ui.confirm.no");
+    const done = () => { holder.hidden = true; holder.replaceChildren(); button.hidden = false; };
+    yes.onclick = () => { done(); run(); };
+    no.onclick = done;
+    holder.append(q, yes, no);
+    button.hidden = true;
+  }
+
+  // --- right now
+  $("#now-form").onsubmit = (e) => {
+    e.preventDefault();
+    const f = e.target;
+    confirmThen($("button.primary", f), t("ui.confirm.start"), async () => {
+      const reply = await act(f, "now", { minutes: Number(f.minutes.value), lock: f.lock.checked, apps: nowApps.value });
+      if (reply.ok) nowApps.set([]);
+    });
+  };
+  // The preset that matches what is typed stays marked.
+  const nowMinutes = $("#now-minutes");
+  const minutePresets = new Map();
+  function syncMinutePresets() {
+    for (const [mins, b] of minutePresets) {
+      const on = Number(nowMinutes.value) === mins;
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on);
+    }
+  }
+  for (const mins of [15, 30, 60, 90]) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = mins;
+    b.onclick = () => { nowMinutes.value = mins; syncMinutePresets(); };
+    $("#minute-presets").append(b);
+    minutePresets.set(mins, b);
+  }
+  nowMinutes.addEventListener("input", syncMinutePresets);
+  syncMinutePresets();
+
+  // --- rules
+  const chips = $("#rule-days");
+  const selectedDays = new Set(DAYS);
+  const chipButtons = new Map();
+  function syncChips() {
+    for (const [day, b] of chipButtons) {
+      const on = selectedDays.has(day);
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on);
+    }
+  }
+  for (const day of DAYS) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = t(`day.${day.toLowerCase()}`);
+    b.onclick = () => {
+      selectedDays.has(day) ? selectedDays.delete(day) : selectedDays.add(day);
+      syncChips();
+    };
+    chips.append(b);
+    chipButtons.set(day, b);
+  }
+  syncChips();
+  // Common choices in one tap.
+  const dayPresets = [["all", DAYS], ["weekdays", DAYS.slice(0, 5)], ["weekends", DAYS.slice(5)]];
+  for (const [key, days] of dayPresets) {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = t(`ui.rules.days_${key}`);
+    b.onclick = () => { selectedDays.clear(); days.forEach((d) => selectedDays.add(d)); syncChips(); previewRule(); };
+    $("#day-presets").append(b);
+  }
+  function describeDays(days) {
+    const present = DAYS.map((d, i) => (days.includes(d) ? i : -1)).filter((i) => i >= 0);
+    if (present.length === 7) return t("ui.days.every");
+    const name = (i) => t(`day.${DAYS[i].toLowerCase()}`);
+    const consecutive = present.length >= 3 && present[present.length - 1] - present[0] + 1 === present.length;
+    return consecutive ? `${name(present[0])}–${name(present[present.length - 1])}` : present.map(name).join(", ");
+  }
+  function describeEffect(lock, apps) {
+    if (lock && apps.length) return t("ui.effect.both", { apps: names(apps) });
+    if (lock) return t("ui.effect.lock");
+    return t("ui.effect.close", { apps: names(apps) });
+  }
+  function describeWindow(from, to) {
+    const overnight = to && from && to <= from;
+    return t(overnight ? "ui.rules.window_overnight" : "ui.rules.window", { from: clock(from), to: clock(to) });
+  }
+  // What the rule will do, in words, as it is being written.
+  function previewRule() {
+    const f = $("#rule-form");
+    const preview = $("#rule-preview");
+    const apps = ruleApps.value;
+    const lock = f.lock.checked;
+    if (!lock && !apps.length) { preview.textContent = t("ui.rules.need_effect"); preview.classList.add("warn"); return false; }
+    preview.classList.remove("warn");
+    if (!f.from.value || !f.to.value) { preview.textContent = ""; return true; }
+    preview.textContent = `${describeDays([...selectedDays])}, ${describeWindow(f.from.value, f.to.value)} ${describeEffect(lock, apps)}`;
+    return true;
+  }
+  $("#rule-form").addEventListener("input", previewRule);
+  $("#rule-form").addEventListener("change", previewRule);
+  chips.addEventListener("click", previewRule);
+  $("#rule-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    if (!previewRule()) return;
+    const rule = { name: f.name.value.trim(), start: f.from.value, end: f.to.value, days: DAYS.filter((d) => selectedDays.has(d)), lock: f.lock.checked, apps: ruleApps.value };
+    const reply = await act(f, "rule_add", { rule });
+    if (reply.ok) { f.reset(); timeFields.forEach((field) => field.reset()); ruleApps.set([]); previewRule(); $("#rule-details").open = false; show($("#rules-feedback"), reply.text, true); }
+  };
+
+  // --- daily allowances
+  $("#allowance-form").onsubmit = async (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const reply = await act(f, "allowance_set", { app: allowanceApp.value[0] ?? "", minutes: Number(f.minutes.value) });
+    if (reply.ok) { f.reset(); allowanceApp.set([]); $("#allowance-details").open = false; show($("#allowances-feedback"), reply.text, true); }
+  };
+  $("#usage-grant").onclick = () => tell({ kind: "usage_access" });
+  $("#setup-watch").onclick = () => tell({ kind: "accessibility" });
+  $("#setup-battery-grant").onclick = () => tell({ kind: "battery" });
+
+  // --- breaks: applied as soon as they change
+  const breaksOn = $("#breaks-on"), every = $("#breaks-every"), rest = $("#breaks-rest");
+  async function applyBreaks() {
+    const note = $("#breaks-note");
+    const reply = breaksOn.checked
+      ? await request("break_set", { work_minutes: Number(every.value), break_minutes: Number(rest.value) })
+      : await request("break_off");
+    show(note, reply.ok ? t("ui.saved") : reply.text, reply.ok);
+    await refresh();
+  }
+  breaksOn.onchange = applyBreaks;
+  every.onchange = () => breaksOn.checked && applyBreaks();
+  rest.onchange = () => breaksOn.checked && applyBreaks();
+
+  // --- reasons
+  let savedReasons = "";
+  $("#reasons-text").addEventListener("input", () => {
+    const dirty = $("#reasons-text").value !== savedReasons;
+    show($(".feedback", $("#reasons-form")), dirty ? t("ui.reasons.unsaved") : "", undefined);
+  });
+  $("#reasons-form").onsubmit = (e) => {
+    e.preventDefault();
+    act(e.target, "reasons_set", { text: $("#reasons-text").value });
+  };
+  $("#pick").onclick = async () => {
+    const reply = await ask({ kind: "pick" });
+    const results = reply.results ?? [];
+    if (results.length) show($("#media-feedback"), results.map((r) => r.text).join("\n"), results.every((r) => r.ok));
+    await refresh();
+  };
+  function mediaTile(item) {
+    const figure = document.createElement("figure");
+    if (item.kind === "video") figure.classList.add("video");
+    const img = document.createElement("img");
+    img.src = item.thumb;
+    img.alt = "";
+    figure.append(img);
+    return figure;
+  }
+  function renderGallery(items) {
+    const gallery = $("#gallery");
+    gallery.replaceChildren();
+    for (const item of items) {
+      const figure = mediaTile(item);
+      const caption = document.createElement("figcaption");
+      const name = document.createElement("span");
+      name.textContent = item.name;
+      const remove = document.createElement("button");
+      remove.type = "button"; remove.className = "quiet"; remove.textContent = t("ui.remove");
+      const holder = document.createElement("span");
+      holder.className = "confirm"; holder.hidden = true;
+      const wrap = document.createElement("span");
+      wrap.append(remove, holder);
+      remove.onclick = () => confirmThen(remove, t("ui.confirm.remove"), () => act(null, "media_remove", { name: item.name }, $("#media-feedback")));
+      caption.append(name, wrap);
+      figure.append(caption);
+      gallery.append(figure);
+    }
+  }
+
+  // --- apps that stay usable while the screen is locked
+  let allowed = [];
+  $("#allowed-edit").onclick = async () => {
+    const picked = await pickApps(allowed, true);
+    if (picked) act(null, "allowed_set", { apps: picked }, $("#allowed-feedback"));
+  };
+
+  // --- settings rows, applied as soon as they change
+  const SETTINGS = [
+    { key: "lead-minutes", field: "lead_minutes", min: 0, max: 1440 },
+    { key: "warn-minutes", field: "warn_minutes", min: 0, max: 60 },
+    { key: "emergency-chars", field: "emergency_chars", min: 0, max: 2000, unit: "ui.characters" },
+    { key: "emergency-minutes", field: "emergency_minutes", min: 1, max: 60 },
+  ];
+  let current = {};
+  const rows = $("#settings-rows");
+  for (const s of SETTINGS) {
+    const row = document.createElement("div");
+    row.className = "setting";
+    row.innerHTML = `<div class="text"><div class="title"></div><div class="desc"></div></div>
+      <div class="control"><input type="number" inputmode="numeric" min="${s.min}" max="${s.max}"><span class="unit"></span></div><div class="note"></div>`;
+    $(".title", row).textContent = t(`ui.settings.${s.field}`);
+    if (T[`ui.settings.${s.field}_desc`]) $(".desc", row).textContent = T[`ui.settings.${s.field}_desc`];
+    else $(".desc", row).remove();
+    $(".unit", row).textContent = t(s.unit ?? "ui.minutes");
+    const input = $("input", row);
+    s.input = input;
+    input.onchange = async () => {
+      const note = $(".note", row);
+      if (Number(input.value) === current[s.field]) return;
+      const reply = await request("set", { key: s.key, value: Number(input.value) });
+      show(note, reply.text, reply.ok);
+      if (!reply.ok) input.value = current[s.field];
+      await refresh();
+    };
+    rows.append(row);
+  }
+  // The page is shown again in the theme or the language just chosen.
+  $("#appearance").onchange = async (e) => {
+    const reply = await request("appearance_set", { mode: e.target.value });
+    if (reply.ok) tell({ kind: "reload" }); else show($("#appearance-note"), reply.text, false);
+  };
+  $("#clock").onchange = async (e) => {
+    const reply = await request("clock_set", { mode: e.target.value });
+    show($("#clock-note"), reply.ok ? t("ui.saved") : reply.text, reply.ok);
+    await refresh();
+  };
+  $("#language").onchange = async (e) => {
+    const reply = await request("language_set", { code: e.target.value });
+    if (reply.ok) tell({ kind: "reload" }); else show($("#language-note"), reply.text, false);
+  };
+
+  // --- the way out
+  $("#leave-open").onclick = () => {
+    $("#leave-phrase").value = "";
+    show($("#leave-feedback"), "");
+    openSheet($("#leave"));
+  };
+  $("#leave-stay").onclick = closeSheet;
+  $("#leave-go").onclick = async () => {
+    const reply = await ask({ kind: "uninstall", phrase: $("#leave-phrase").value });
+    if (!reply.ok) show($("#leave-feedback"), reply.text, false);
+  };
+
+  // --- drawing
+  function listItem(list, name, pkg, active, desc, onRemove) {
+    const li = document.createElement("li");
+    const title = document.createElement("span");
+    title.className = "name";
+    if (pkg) title.append(icon(pkg));
+    title.append(name);
+    if (active) {
+      const pill = document.createElement("span");
+      pill.className = "pill";
+      pill.textContent = t("ui.rules.active");
+      title.append(pill);
+    }
+    const text = document.createElement("span");
+    text.className = "desc";
+    text.textContent = desc;
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "quiet";
+    remove.textContent = t("ui.remove");
+    const holder = document.createElement("span");
+    holder.className = "confirm";
+    holder.hidden = true;
+    const wrap = document.createElement("span");
+    wrap.className = "side";
+    wrap.append(remove, holder);
+    remove.onclick = () => confirmThen(remove, t("ui.confirm.remove"), onRemove);
+    li.append(title, wrap, text);
+    list.append(li);
+  }
+
+  // What changes by the second: what is happening now, and how far the next break is.
+  function beat(now) {
+    if (now.hour12 !== hour12) {
+      hour12 = now.hour12;
+      paintAxis();
+      timeFields.forEach((field) => field.show(hour12));
+    }
+    $("#hero").dataset.kind = now.headline.kind;
+    $("#hero-title").textContent = now.headline.title;
+    $("#hero-details").textContent = now.headline.details.join("\n");
+    const meter = $("#break-meter");
+    meter.hidden = !now.break;
+    if (!now.break) return;
+    const resting = !!now.break.until;
+    meter.classList.toggle("resting", resting);
+    $(".fill", meter).style.setProperty("--done", resting ? 1 : now.break.fraction);
+    $("#break-used").textContent = resting ? t("ui.breaks.resting", { until: now.break.until }) : t("ui.breaks.used", { used: now.break.used });
+    $("#break-left").textContent = resting ? "" : t("ui.breaks.left", { left: now.break.left });
+  }
+
+  function render(state) {
+    const c = state.config;
+    labels = { ...labels, ...state.labels };
+    beat(state);
+    paintWeek(c);
+
+    const rules = $("#rules-list");
+    rules.replaceChildren();
+    if (!c.rules.length) rules.innerHTML = `<li class="empty">${t("ui.rules.empty")}</li>`;
+    for (const rule of c.rules) {
+      const desc = `${describeDays(rule.days)}, ${describeWindow(rule.start.slice(0, 5), rule.end.slice(0, 5))} ${describeEffect(rule.lock, rule.apps)}`;
+      listItem(rules, rule.name, null, state.active.includes(rule.name), desc, () => act(null, "rule_remove", { name: rule.name }, $("#rules-feedback")));
+    }
+    $("#rule-details").open = $("#rule-details").open || !c.rules.length;
+
+    const b = c.breaks;
+    if (document.activeElement !== breaksOn) breaksOn.checked = !!b;
+    if (b && document.activeElement !== every) every.value = b.work_minutes;
+    if (b && document.activeElement !== rest) rest.value = b.break_minutes;
+    for (const id of ["breaks-every-row", "breaks-rest-row"]) {
+      document.getElementById(id).classList.toggle("off", !b);
+      $("input", document.getElementById(id)).disabled = !b;
+    }
+
+    const allowances = $("#allowances-list");
+    allowances.replaceChildren();
+    if (!c.allowances.length) allowances.innerHTML = `<li class="empty">${t("ui.allowances.empty")}</li>`;
+    for (const a of c.allowances) {
+      const desc = t("ui.allowances.item", { minutes: a.minutes, left: state.allowance_left[a.app] ?? "" });
+      listItem(allowances, label(a.app), a.app, false, desc, () => act(null, "allowance_remove", { app: a.app }, $("#allowances-feedback")));
+    }
+    $("#allowance-details").open = $("#allowance-details").open || !c.allowances.length;
+    $("#usage-notice").hidden = state.usage_access;
+
+    savedReasons = c.reasons;
+    if (document.activeElement !== $("#reasons-text")) $("#reasons-text").value = c.reasons;
+    renderGallery(state.media);
+    // Nothing set up yet: point at the first two things to do.
+    const fresh = !c.rules.length && !c.breaks && !c.allowances.length && !c.oneoffs.length;
+    $("#starts").hidden = !fresh;
+    $("#start-reasons").hidden = !!c.reasons;
+
+    allowed = c.allowed;
+    const allowedList = $("#allowed-list");
+    allowedList.replaceChildren();
+    if (!allowed.length) allowedList.innerHTML = `<li class="empty">${t("ui.allowed.none")}</li>`;
+    for (const pkg of allowed) {
+      const li = document.createElement("li");
+      li.append(icon(pkg), label(pkg));
+      allowedList.append(li);
+    }
+
+    // How despegate is enforcing, and what is still missing for it to.
+    $("#setup").classList.toggle("done", state.daemon);
+    $("#setup-text").textContent = t({ owner: "ui.setup.owner_yes", watch: "ui.setup.watch_yes", none: "ui.setup.none" }[state.power]);
+    $("#setup-watch").hidden = state.power !== "none";
+    $("#setup-weak").hidden = state.power !== "watch";
+    $("#setup-removable").hidden = !(state.power === "owner" && state.removable);
+    $("#setup-battery").hidden = state.power !== "watch" || state.battery_free;
+    $("#setup-owner").hidden = state.power === "owner";
+    $("#setup-command").textContent = state.owner_command;
+
+    $("#leave-why").textContent = t(c.reasons || state.media.length ? "uninstall.your_reasons" : "uninstall.no_reasons");
+    $("#leave-reasons").textContent = c.reasons;
+    $("#leave-reasons").hidden = !c.reasons;
+    $("#leave-media").replaceChildren(...state.media.map(mediaTile));
+    $("#leave-prompt").textContent = t("uninstall.confirm", { phrase: t("uninstall.phrase") });
+
+    current = c;
+    for (const s of SETTINGS) if (document.activeElement !== s.input) s.input.value = c[s.field];
+    if (document.activeElement !== $("#appearance")) $("#appearance").value = c.appearance ?? "system";
+    if (document.activeElement !== $("#clock")) $("#clock").value = c.clock ?? "system";
+    const select = $("#language");
+    if (document.activeElement !== select) {
+      select.replaceChildren();
+      select.append(new Option(t("ui.settings.auto"), "auto"));
+      for (const l of state.languages) select.append(new Option(l.name, l.code));
+      select.value = c.language ?? "auto";
+    }
+  }
+
+  async function refresh() {
+    const reply = await ask({ kind: "state" });
+    if (reply.state) render(reply.state);
+  }
+  window.__refresh = refresh;
+  refresh();
+  setInterval(refresh, 15000);
+  setInterval(async () => {
+    if (document.hidden) return;
+    const reply = await ask({ kind: "pulse" });
+    if (reply.pulse) beat(reply.pulse);
+  }, 2000);
+</script>
+</body>
+</html>

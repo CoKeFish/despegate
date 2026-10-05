@@ -74,6 +74,9 @@ pub struct LockView {
     pub media: Vec<String>,
     pub challenge: Option<String>,
     pub emergency_minutes: u32,
+    /// Something to do with the time, when the lock is a break.
+    #[serde(default)]
+    pub idea: Option<String>,
 }
 
 /// "1 h 05 min" or "4:59", for banners and the lock screen.
@@ -742,6 +745,7 @@ mod tests {
                 media: Vec::new(),
                 challenge: challenge.map(str::to_string),
                 emergency_minutes: 5,
+                idea: None,
             }),
             ..UiState::default()
         }

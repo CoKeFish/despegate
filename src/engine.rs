@@ -27,7 +27,11 @@ const TICK: Duration = Duration::from_secs(1);
 const FLASH: Duration = Duration::from_secs(6);
 /// An agent report older than this says nothing about the present.
 const REPORT_FRESH: Duration = Duration::from_secs(3);
-const SAVE_EVERY_TICKS: u32 = 15;
+/// Every second, so the settings window, which reads the clocks from disk,
+/// counts down live.
+const SAVE_EVERY_TICKS: u32 = 1;
+/// How many break ideas the catalogs hold (`break.idea_1` and on).
+const IDEAS: i64 = 8;
 /// Closed during a screen lock so it cannot be used to end the agent.
 const TASK_MANAGER: &str = "taskmgr.exe";
 /// This many agent deaths within a minute during a lock is taken as someone
@@ -314,6 +318,15 @@ impl Daemon {
         if break_started {
             log!("break started");
         }
+        // A focus session lasts until the long break, which may have just come.
+        if config.focus.is_some() && shared.state.data.focus_over(config.breaks.as_ref()) {
+            shared.config.data.focus = None;
+            log!("focus session over");
+            if let Err(e) = shared.config.save() {
+                log!("could not save the config: {e}");
+            }
+        }
+        let config = shared.config.data.clone();
         self.ticks += 1;
         if (break_started || self.ticks.is_multiple_of(SAVE_EVERY_TICKS))
             && let Err(e) = shared.state.save()
@@ -332,8 +345,13 @@ impl Daemon {
             });
         }
         let exhausted = state.exhausted(&config, now);
+        // A focus session keeps its programs closed while working; breaks let them through.
+        let focusing: Vec<String> = match &config.focus {
+            Some(focus) if state.on_break(now).is_none() => focus.apps.clone(),
+            _ => Vec::new(),
+        };
         let lock_until = blocks.iter().filter(|b| b.lock).map(|b| b.until).max();
-        let enforcing = !blocks.is_empty() || !exhausted.is_empty();
+        let enforcing = !blocks.is_empty() || !exhausted.is_empty() || !focusing.is_empty();
 
         let mode = match shared.paused_until {
             Some(until) if enforcing => Mode::Banner {
@@ -344,6 +362,7 @@ impl Daemon {
                 let mut apps: HashSet<String> =
                     blocks.iter().flat_map(|b| b.apps.iter().cloned()).collect();
                 apps.extend(exhausted.iter().cloned());
+                apps.extend(focusing.iter().cloned());
                 if lock_until.is_some() {
                     apps.insert(TASK_MANAGER.into());
                 }
@@ -364,7 +383,10 @@ impl Daemon {
                             app = app,
                             until = until.format("%H:%M")
                         ),
-                        None => tr!(lang, "banner.allowance_spent", app = app),
+                        None if exhausted.contains(&app) => {
+                            tr!(lang, "banner.allowance_spent", app = app)
+                        }
+                        None => tr!(lang, "banner.focus", app = app),
                     };
                     self.flash = Some((text, Instant::now() + FLASH));
                 }
@@ -379,6 +401,7 @@ impl Daemon {
                             media: config.media.clone(),
                             challenge: shared.challenge.clone(),
                             emergency_minutes: config.emergency_minutes,
+                            idea: state.on_break(now).map(|until| idea(until, lang)),
                         })
                     }
                     None => self.banner(&config, state, &sensors, now, lang),
@@ -531,6 +554,12 @@ impl Daemon {
 }
 
 /// Random text in groups of five, without look-alike characters.
+/// Something to do with a break, the same one for the whole of it.
+fn idea(until: NaiveDateTime, lang: Lang) -> String {
+    let n = (until.and_utc().timestamp() / 60).rem_euclid(IDEAS) + 1;
+    lang.format(&format!("break.idea_{n}"), &[])
+}
+
 fn challenge(len: usize) -> String {
     const ALPHABET: &[u8] = b"abcdefghjkmnpqrstuvwxyz23456789";
     let random = RandomState::new();

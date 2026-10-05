@@ -251,6 +251,8 @@
   .preview { color: var(--muted); margin: 0 0 12px; font-size: 15px; min-height: 1.5em; }
   .preview.warn { color: var(--bad); }
   .feedback.error, .note.error { color: var(--bad); }
+  /* A change that was refused says so where it was made, and stays until the next one. */
+  .setting .note.error { font-weight: 700; padding: 8px 12px; margin-top: 6px; border-radius: 10px; background: color-mix(in srgb, var(--bad) 12%, transparent); }
   .feedback.ok, .note.ok { color: var(--ok); }
   pre { font: 14px/1.5 Consolas, monospace; color: var(--muted); white-space: pre-wrap; margin: 0; }
   .about { color: var(--muted); font-size: 15px; margin-top: 40px; }
@@ -274,6 +276,37 @@
   .drop { border: 2px dashed var(--edge); border-radius: 16px; padding: 22px; text-align: center; color: var(--muted); margin-top: 12px; transition: background-color 150ms ease, border-color 150ms ease; }
   .drop div { margin-top: 6px; font-size: 15px; }
   .drop.over { border-color: var(--strong); color: var(--fg); background: var(--note); }
+
+  /* The timer: what is left of the phase, how far along it is, and the round of the cycle.
+     Working is the sticker yellow; a break is the night. */
+  .timer { margin: 4px 0 28px; padding: 26px 28px 22px; border-radius: 22px; background: var(--sol); color: var(--ink); transition: background-color 300ms ease, color 300ms ease; }
+  .timer[data-phase="rest"], .timer[data-phase="long"] { background: var(--active-bg); color: var(--active-fg); }
+  .timer.off { background: transparent; color: var(--fg); border: 2px dashed var(--edge); }
+  .timer-off { margin: 0; color: var(--muted); }
+  .timer .clock { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 16px; }
+  .timer .clock span:first-child { font-size: 88px; line-height: 0.95; font-weight: 800; letter-spacing: -0.04em; }
+  .timer .clock .what { font-size: 20px; font-weight: 700; }
+  .timer .bar { height: 10px; margin: 18px 0 14px; border-radius: 5px; background: color-mix(in srgb, currentColor 18%, transparent); overflow: hidden; }
+  .timer .fill { height: 100%; border-radius: 5px; background: currentColor; transform-origin: left; transform: scaleX(var(--done, 0)); transition: transform 1s linear; }
+  .timer .round { display: flex; align-items: center; gap: 12px; font-weight: 700; }
+  .timer .dots { display: inline-flex; gap: 6px; }
+  .timer .dots i { width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; }
+  .timer .dots i.on { background: currentColor; }
+  .timer .dots i.long { width: 22px; border-radius: 6px; }
+  .session-on { margin: 0 0 14px; font-weight: 700; }
+  .rhythm h2 { margin-top: 8px; }
+  .rhythm .presets { margin: 0 0 12px; }
+  .rhythm .setting.off .text { opacity: 0.5; }
+  /* The last seven days: use as the height of each bar, breaks above it. */
+  .history p { margin: 0 0 14px; }
+  .history .streak { margin: 14px 0 0; color: var(--muted); }
+  .bars { display: grid; grid-template-columns: repeat(7, 1fr); gap: 8px; align-items: end; height: 150px; }
+  .bars .col { display: grid; grid-template-rows: auto 1fr auto; justify-items: center; height: 100%; gap: 4px; font-size: 13px; color: var(--muted); }
+  .bars .col .n { font-weight: 700; color: var(--fg); }
+  .bars .col .stack { display: flex; align-items: flex-end; width: 100%; }
+  .bars .col .b { width: 100%; min-height: 3px; border-radius: 6px 6px 3px 3px; background: var(--tint); box-shadow: inset 0 0 0 1.5px var(--edge); }
+  .bars .col.today .b { background: var(--sol); box-shadow: inset 0 0 0 2px var(--fg); }
+  .bars .col.today { color: var(--fg); font-weight: 800; }
 
   @container main (min-width: 1000px) {
     .page { padding: clamp(44px, 6vh, 72px) 56px 64px; font-size: 17px; }
@@ -304,7 +337,13 @@
     #settings-rows { grid-column: 1; grid-row: 2 / span 3; }
     #settings > :is(.setting, .about) { grid-column: 2; }
     #settings-rows .setting:last-of-type { border-bottom: 1px solid var(--line); }
-    #breaks > .setting { max-width: 760px; }
+    #focus.current { display: grid; grid-template-columns: minmax(0, 1fr) 440px; column-gap: 56px; row-gap: 8px; align-items: start; }
+    #focus > :is(h1, .lead) { grid-column: 1 / -1; }
+    #focus .timer { grid-column: 1; grid-row: 3; }
+    #focus .session { grid-column: 2; grid-row: 3; margin-top: 0; }
+    #focus .rhythm { grid-column: 1; grid-row: 4; }
+    #focus .history { grid-column: 2; grid-row: 4; }
+    .timer .clock span:first-child { font-size: 112px; }
   }
 
   @media (prefers-reduced-motion: reduce) {
@@ -398,20 +437,66 @@
     </details>
   </section>
 
-  <section class="page" id="breaks">
-    <h1 data-t="ui.breaks.heading"></h1>
-    <div class="setting" id="breaks-toggle-row">
-      <div class="text"><div class="title" id="breaks-toggle-title" data-t="ui.breaks.toggle"></div></div>
-      <div class="control"><label class="switch"><input type="checkbox" id="breaks-on" aria-labelledby="breaks-toggle-title"><span></span></label></div>
-      <div class="note" id="breaks-note"></div>
+  <section class="page" id="focus">
+    <h1 data-t="ui.focus.heading"></h1>
+    <p class="lead" data-t="ui.focus.hint"></p>
+
+    <div class="timer" id="timer" data-phase="work">
+      <p class="timer-off" id="timer-off" data-t="ui.focus.off" hidden></p>
+      <div class="timer-on" id="timer-on">
+        <div class="clock"><span id="timer-left">&nbsp;</span><span class="what" id="timer-label"></span></div>
+        <div class="bar"><div class="fill"></div></div>
+        <div class="round"><span class="dots" id="timer-dots" aria-hidden="true"></span><span id="timer-round"></span></div>
+      </div>
     </div>
-    <div class="setting" id="breaks-every-row">
-      <div class="text"><div class="title" id="breaks-every-title" data-t="ui.breaks.every"></div></div>
-      <div class="control"><input type="number" id="breaks-every" min="5" max="480" value="50" aria-labelledby="breaks-every-title"><span class="unit" data-t="ui.minutes"></span></div>
+
+    <div class="tool session" id="session">
+      <h2 data-t="ui.focus.session_heading"></h2>
+      <p class="hint" id="session-hint"></p>
+      <p class="session-on" id="session-on" hidden></p>
+      <form id="session-form">
+        <label for="session-apps" data-t="ui.focus.session_apps"></label>
+        <input id="session-apps" name="apps">
+        <div class="actions">
+          <button type="submit" class="primary" id="session-start"></button>
+          <span class="confirm" hidden></span>
+          <button type="button" class="quiet" id="session-stop" data-t="ui.focus.stop" hidden></button>
+        </div>
+        <p class="feedback" aria-live="polite"></p>
+      </form>
     </div>
-    <div class="setting" id="breaks-rest-row">
-      <div class="text"><div class="title" id="breaks-rest-title" data-t="ui.breaks.rest"></div></div>
-      <div class="control"><input type="number" id="breaks-rest" min="1" max="120" value="10" aria-labelledby="breaks-rest-title"><span class="unit" data-t="ui.minutes"></span></div>
+
+    <div class="rhythm">
+      <h2 data-t="ui.focus.rhythm"></h2>
+      <div class="presets" id="rhythm-presets"></div>
+      <div class="setting" id="breaks-toggle-row">
+        <div class="text"><div class="title" id="breaks-toggle-title" data-t="ui.focus.toggle"></div></div>
+        <div class="control"><label class="switch"><input type="checkbox" id="breaks-on" aria-labelledby="breaks-toggle-title"><span></span></label></div>
+        <div class="note" id="breaks-note"></div>
+      </div>
+      <div class="setting needs-breaks">
+        <div class="text"><div class="title" id="breaks-every-title" data-t="ui.focus.work"></div></div>
+        <div class="control"><input type="number" id="breaks-every" min="5" max="480" value="25" aria-labelledby="breaks-every-title"><span class="unit" data-t="ui.minutes"></span></div>
+      </div>
+      <div class="setting needs-breaks">
+        <div class="text"><div class="title" id="breaks-rest-title" data-t="ui.focus.rest"></div></div>
+        <div class="control"><input type="number" id="breaks-rest" min="1" max="120" value="5" aria-labelledby="breaks-rest-title"><span class="unit" data-t="ui.minutes"></span></div>
+      </div>
+      <div class="setting needs-breaks">
+        <div class="text"><div class="title" id="breaks-long-title" data-t="ui.focus.long"></div><div class="desc" data-t="ui.focus.long_desc"></div></div>
+        <div class="control"><input type="number" id="breaks-long" min="0" max="180" value="15" aria-labelledby="breaks-long-title"><span class="unit" data-t="ui.minutes"></span></div>
+      </div>
+      <div class="setting needs-breaks">
+        <div class="text"><div class="title" id="breaks-cycles-title" data-t="ui.focus.cycles"></div></div>
+        <div class="control"><input type="number" id="breaks-cycles" min="2" max="12" value="4" aria-labelledby="breaks-cycles-title"><span class="unit" data-t="ui.focus.cycles_unit"></span></div>
+      </div>
+    </div>
+
+    <div class="history" id="history">
+      <h2 data-t="ui.focus.history"></h2>
+      <p id="history-today"></p>
+      <div class="bars" id="history-bars"></div>
+      <p class="streak" id="history-streak"></p>
     </div>
   </section>
 
@@ -478,7 +563,7 @@
   const t = (key, vars = {}) => (T[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? `{${name}}`);
   const $ = (selector, root = document) => root.querySelector(selector);
   const DAYS = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
-  const PAGES = ["home", "rules", "breaks", "allowances", "reasons", "settings"];
+  const PAGES = ["home", "focus", "rules", "allowances", "reasons", "settings"];
 
   for (const el of document.querySelectorAll("[data-t]")) el.textContent = t(el.dataset.t, { version: "__VERSION__" });
 
@@ -754,19 +839,110 @@
     if (reply.ok) { f.reset(); previewRule(); $("#rule-details").open = false; show($("#rules-feedback"), reply.text, true); }
   };
 
-  // --- breaks: applied as soon as they change
+  // --- the rhythm of breaks: applied as soon as it changes
   const breaksOn = $("#breaks-on"), every = $("#breaks-every"), rest = $("#breaks-rest");
+  const longBreak = $("#breaks-long"), cycles = $("#breaks-cycles");
+  const RHYTHMS = [["pomodoro", 25, 5, 15, 4], ["deep", 50, 10, 30, 3], ["long", 90, 20, 0, 4]];
+  const rhythmButtons = RHYTHMS.map(([key, ...values]) => {
+    const b = document.createElement("button");
+    b.type = "button";
+    b.textContent = t(`ui.focus.preset_${key}`);
+    b.onclick = () => {
+      [every.value, rest.value, longBreak.value, cycles.value] = values;
+      breaksOn.checked = true;
+      applyBreaks();
+    };
+    $("#rhythm-presets").append(b);
+    return [b, values];
+  });
+  function syncRhythm(policy) {
+    const now = policy ? [policy.work_minutes, policy.break_minutes, policy.long_break_minutes, policy.cycles] : null;
+    for (const [b, values] of rhythmButtons) {
+      // Without a long break, the number of rounds does not matter.
+      const on = !!now && values.every((v, i) => i === 3 && !values[2] ? true : v === now[i]);
+      b.classList.toggle("on", on);
+      b.setAttribute("aria-pressed", on);
+    }
+  }
   async function applyBreaks() {
     const note = $("#breaks-note");
-    const args = breaksOn.checked ? ["break", "set", "--every", every.value, "--for", rest.value] : ["break", "off"];
+    const args = breaksOn.checked
+      ? ["break", "set", "--every", every.value, "--for", rest.value, "--cycles", cycles.value]
+      : ["break", "off"];
+    if (breaksOn.checked && Number(longBreak.value) > 0) args.push("--long", longBreak.value);
     show(note, t("ui.working"));
     const reply = await cli(...args);
     show(note, reply.ok ? t("ui.saved") : reply.text, reply.ok);
     await refresh();
   }
   breaksOn.onchange = applyBreaks;
-  every.onchange = () => breaksOn.checked && applyBreaks();
-  rest.onchange = () => breaksOn.checked && applyBreaks();
+  for (const field of [every, rest, longBreak, cycles]) field.onchange = () => breaksOn.checked && applyBreaks();
+
+  // --- the focus session
+  $("#session-form").onsubmit = (e) => {
+    e.preventDefault();
+    const f = e.target;
+    const apps = splitApps(f.apps.value);
+    if (!apps.length) { f.apps.focus(); return; }
+    const args = ["focus", "start", ...apps.flatMap((app) => ["--app", app])];
+    const go = async () => { const reply = await act(f, args); if (reply.ok) f.reset(); };
+    if (focusing) go(); else confirmThen($("#session-start"), t("ui.focus.confirm"), go);
+  };
+  $("#session-stop").onclick = () => act($("#session-form"), ["focus", "stop"]);
+
+  // What the timer shows; called every second with what the daemon counts.
+  let focusing = false;
+  function renderFocus(f) {
+    const timer = $("#timer");
+    timer.classList.toggle("off", !f);
+    $("#timer-off").hidden = !!f;
+    $("#timer-on").hidden = !f;
+    focusing = !!(f && f.session);
+    $("#session-start").disabled = !f;
+    $("#session-start").textContent = t(focusing ? "ui.focus.add" : "ui.focus.start");
+    $("#session-stop").hidden = !focusing;
+    $("#session-on").hidden = !focusing;
+    $("#session-hint").textContent = t(!f ? "ui.focus.session_off" : f.has_long ? "ui.focus.session_hint" : "ui.focus.session_hint_short");
+    if (!f) return;
+    if (focusing) $("#session-on").textContent = t(f.has_long ? "ui.focus.on" : "ui.focus.on_short", { apps: f.session.apps.join(", ") });
+
+    timer.dataset.phase = f.phase;
+    $("#timer-left").textContent = f.left;
+    $("#timer-label").textContent = t({ work: "ui.focus.working", rest: "ui.focus.resting", long: "ui.focus.resting_long" }[f.phase]);
+    $(".fill", timer).style.setProperty("--done", f.total_secs ? 1 - f.left_secs / f.total_secs : 0);
+    const dots = $("#timer-dots");
+    dots.replaceChildren();
+    if (f.has_long) {
+      const done = f.phase === "long" ? f.cycles : f.cycle;
+      for (let i = 0; i < f.cycles; i++) {
+        const dot = document.createElement("i");
+        dot.classList.toggle("on", i < done);
+        dot.classList.toggle("long", i === f.cycles - 1);
+        dots.append(dot);
+      }
+      $("#timer-round").textContent = f.phase === "work" && f.next_long
+        ? t("ui.focus.next_long")
+        : t("ui.focus.cycle", { n: Math.min(f.cycle + (f.phase === "work" ? 1 : 0), f.cycles), cycles: f.cycles });
+    } else {
+      $("#timer-round").textContent = t("ui.focus.used", { used: f.used });
+    }
+
+    $("#history-today").textContent = t("ui.focus.today", { work: f.today.work, breaks: f.today.breaks });
+    const most = Math.max(30, ...f.week.map((d) => d.minutes));
+    const bars = $("#history-bars");
+    bars.replaceChildren(...f.week.map((d) => {
+      const col = document.createElement("div");
+      col.className = "col" + (d.today ? " today" : "");
+      col.title = t("ui.focus.bar", d);
+      col.innerHTML = '<span class="n"></span><span class="stack"><span class="b"></span></span><span class="d"></span>';
+      $(".n", col).textContent = d.breaks || "";
+      $(".b", col).style.height = `${(d.minutes / most) * 100}%`;
+      $(".d", col).textContent = d.day;
+      return col;
+    }));
+    $("#history-streak").textContent = f.streak > 1 ? t("ui.focus.streak", { days: f.streak })
+      : f.streak === 1 ? t("ui.focus.streak_one") : t("ui.focus.streak_none");
+  }
 
   // --- allowances
   $("#allowance-form").onsubmit = async (e) => {
@@ -938,12 +1114,16 @@
 
     const b = c.breaks;
     if (document.activeElement !== breaksOn) breaksOn.checked = !!b;
-    if (b && document.activeElement !== every) every.value = b.work_minutes;
-    if (b && document.activeElement !== rest) rest.value = b.break_minutes;
-    for (const id of ["breaks-every-row", "breaks-rest-row"]) {
-      document.getElementById(id).classList.toggle("off", !b);
-      $("input", document.getElementById(id)).disabled = !b;
+    if (b) {
+      const fields = [[every, b.work_minutes], [rest, b.break_minutes], [longBreak, b.long_break_minutes], [cycles, b.cycles]];
+      for (const [field, value] of fields) if (document.activeElement !== field) field.value = value;
     }
+    for (const row of document.querySelectorAll(".rhythm .needs-breaks")) {
+      row.classList.toggle("off", !b);
+      $("input", row).disabled = !b;
+    }
+    syncRhythm(b);
+    renderFocus(state.focus);
 
     const allowances = $("#allowances-list");
     allowances.replaceChildren();
@@ -979,6 +1159,17 @@
   }
   refresh();
   setInterval(refresh, 15000);
+  // What is happening now counts down by the second, so it is asked for every second.
+  setInterval(async () => {
+    if (document.hidden) return;
+    const reply = await ask({ kind: "pulse" });
+    const h = reply.pulse && reply.pulse.headline;
+    if (!h) return;
+    $("#hero").dataset.kind = h.kind;
+    $("#hero-title").textContent = h.title;
+    $("#hero-details").textContent = h.details.join("\n");
+    renderFocus(reply.pulse.focus);
+  }, 1000);
 </script>
 </body>
 </html>

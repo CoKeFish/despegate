@@ -1,0 +1,7 @@
+# Gradle and build output
+.gradle/
+.kotlin/
+build/
+# Machine-specific SDK location
+local.properties
+*.iml

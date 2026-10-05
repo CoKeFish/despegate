@@ -7,7 +7,10 @@
 use chrono::{Datelike, Duration, NaiveDateTime, Weekday};
 use serde::{Deserialize, Serialize};
 
-use crate::config::{Allowance, AppError, BreakPolicy, Config, OneOff, Rule, WEEK, normalize_app};
+use crate::config::{
+    Allowance, AppError, BreakPolicy, Config, Focus, OneOff, Rule, WEEK, default_cycles,
+    normalize_app,
+};
 use crate::i18n::Lang;
 use crate::media::ImportError;
 use crate::overlay::{Mode, countdown};
@@ -58,8 +61,18 @@ pub enum Request {
     BreakSet {
         work_minutes: u32,
         break_minutes: u32,
+        /// 0 leaves every break short.
+        #[serde(default)]
+        long_break_minutes: u32,
+        #[serde(default = "default_cycles")]
+        cycles: u32,
     },
     BreakOff,
+    /// Keeps these programs closed while working, until the next long break.
+    FocusStart {
+        apps: Vec<String>,
+    },
+    FocusStop,
     AllowanceSet {
         app: String,
         minutes: u32,
@@ -184,17 +197,32 @@ pub fn handle(
         Request::BreakSet {
             work_minutes,
             break_minutes,
+            long_break_minutes,
+            cycles,
         } => break_set(
             cfg,
             Some(BreakPolicy {
                 work_minutes,
                 break_minutes,
+                long_break_minutes,
+                cycles,
             }),
             now,
             rt,
             lang,
         ),
         Request::BreakOff => break_set(cfg, None, now, rt, lang),
+        Request::FocusStart { apps } => focus_start(cfg, apps, now, lang),
+        Request::FocusStop => {
+            if cfg.focus.is_none() {
+                Err(tr!(lang, "error.no_focus"))
+            } else {
+                may_loosen(cfg, now, rt, lang).map(|()| {
+                    cfg.focus = None;
+                    tr!(lang, "focus.stopped")
+                })
+            }
+        }
         Request::AllowanceSet { app, minutes } => {
             allowance_set(cfg, &app, Some(minutes), now, rt, lang)
         }
@@ -284,10 +312,11 @@ pub fn locked_in(cfg: &Config, state: &State, now: NaiveDateTime, lang: Lang) ->
             lead = cfg.lead_minutes
         ));
     }
-    // With short work periods the full lead time would never leave a window
-    // in which the break policy can be changed.
+    // Breaks are a choice, not a sentence: they close in only once their
+    // warning is up, so for most of a work period they can still be changed
+    // or turned off. Short work periods shrink that further.
     let policy = cfg.breaks?;
-    let lead = cfg.lead_minutes.min(policy.work_minutes / 2);
+    let lead = cfg.warn_minutes.min(policy.work_minutes / 2);
     let due = state.break_due_in(cfg)?;
     (due <= Duration::minutes(lead as i64))
         .then(|| tr!(lang, "why.break_imminent", left = countdown(due)))
@@ -559,10 +588,24 @@ fn break_set(
         if !(1..=120).contains(&p.break_minutes) {
             return Err(tr!(lang, "error.break_rest_range"));
         }
+        if p.long_break_minutes != 0 && !(p.break_minutes + 1..=180).contains(&p.long_break_minutes)
+        {
+            return Err(tr!(lang, "error.break_long_range"));
+        }
+        if p.long_break_minutes != 0 && !(2..=12).contains(&p.cycles) {
+            return Err(tr!(lang, "error.break_cycles_range"));
+        }
     }
     let weaker = match (cfg.breaks, policy) {
         (Some(old), Some(new)) => {
-            new.work_minutes > old.work_minutes || new.break_minutes < old.break_minutes
+            // A long break is loosened by shortening it, spacing it out or dropping it.
+            let long_looser = old.has_long()
+                && (!new.has_long()
+                    || new.long_break_minutes < old.long_break_minutes
+                    || new.cycles > old.cycles);
+            new.work_minutes > old.work_minutes
+                || new.break_minutes < old.break_minutes
+                || long_looser
         }
         (Some(_), None) => true,
         (None, Some(_)) => false,
@@ -572,7 +615,18 @@ fn break_set(
         may_loosen(cfg, now, rt, lang)?;
     }
     cfg.breaks = policy;
+    if policy.is_none() {
+        cfg.focus = None;
+    }
     Ok(match policy {
+        Some(p) if p.has_long() => tr!(
+            lang,
+            "break.set_long",
+            rest = p.break_minutes,
+            work = p.work_minutes,
+            long = p.long_break_minutes,
+            cycles = p.cycles
+        ),
         Some(p) => tr!(
             lang,
             "break.set",
@@ -581,6 +635,39 @@ fn break_set(
         ),
         None => tr!(lang, "break.off"),
     })
+}
+
+/// Starting a focus session, or adding programs to one, only tightens.
+fn focus_start(
+    cfg: &mut Config,
+    apps: Vec<String>,
+    now: NaiveDateTime,
+    lang: Lang,
+) -> Result<String, String> {
+    let Some(policy) = cfg.breaks else {
+        return Err(tr!(lang, "error.focus_needs_breaks"));
+    };
+    let added = normalize_apps(apps, lang)?;
+    if added.is_empty() {
+        return Err(tr!(lang, "error.focus_no_apps"));
+    }
+    // What was already kept closed stays first, and the session keeps its start.
+    let (mut apps, started) = match cfg.focus.take() {
+        Some(old) => (old.apps, old.started),
+        None => (Vec::new(), now),
+    };
+    for app in added {
+        if !apps.contains(&app) {
+            apps.push(app);
+        }
+    }
+    let message = if policy.has_long() {
+        tr!(lang, "focus.started_long", apps = apps.join(", "))
+    } else {
+        tr!(lang, "focus.started", apps = apps.join(", "))
+    };
+    cfg.focus = Some(Focus { apps, started });
+    Ok(message)
 }
 
 fn allowance_set(
@@ -709,14 +796,29 @@ fn status(cfg: &Config, now: NaiveDateTime, rt: &Runtime, lang: Lang) -> String 
         None => lines.push(tr!(lang, "status.breaks_off")),
         Some(policy) => {
             let left = rt.state.break_due_in(cfg).unwrap_or_default();
-            lines.push(tr!(
-                lang,
-                "status.breaks",
-                rest = policy.break_minutes,
-                work = policy.work_minutes,
-                left = countdown(left)
-            ));
+            lines.push(if policy.has_long() {
+                tr!(
+                    lang,
+                    "status.breaks_long",
+                    rest = policy.break_minutes,
+                    work = policy.work_minutes,
+                    long = policy.long_break_minutes,
+                    cycles = policy.cycles,
+                    left = countdown(left)
+                )
+            } else {
+                tr!(
+                    lang,
+                    "status.breaks",
+                    rest = policy.break_minutes,
+                    work = policy.work_minutes,
+                    left = countdown(left)
+                )
+            });
         }
+    }
+    if let Some(focus) = &cfg.focus {
+        lines.push(tr!(lang, "status.focus", apps = focus.apps.join(", ")));
     }
 
     if cfg.allowances.is_empty() {
@@ -949,15 +1051,83 @@ mod tests {
     }
 
     #[test]
+    fn a_long_break_is_loosened_by_shortening_spacing_or_dropping_it() {
+        let mut cfg = Config::default();
+        let set = |long_break_minutes, cycles| Request::BreakSet {
+            work_minutes: 25,
+            break_minutes: 5,
+            long_break_minutes,
+            cycles,
+        };
+        let nearly_due = State {
+            usage_secs: 24 * 60,
+            ..State::default()
+        };
+        assert!(run(&mut cfg, set(20, 4), at(12, 0)).response.ok);
+        // Shorter than the short break, or cycles out of range: refused.
+        assert!(!run(&mut cfg, set(5, 4), at(12, 0)).response.ok);
+        assert!(!run(&mut cfg, set(20, 1), at(12, 0)).response.ok);
+        // Close to a break, longer or more often is fine; the reverse is not.
+        assert!(
+            run_with(&mut cfg, &nearly_due, set(30, 3), at(12, 0))
+                .response
+                .ok
+        );
+        for looser in [set(25, 3), set(30, 4), set(0, 4)] {
+            assert!(
+                !run_with(&mut cfg, &nearly_due, looser, at(12, 0))
+                    .response
+                    .ok
+            );
+        }
+        assert_eq!(cfg.breaks.unwrap().long_break_minutes, 30);
+    }
+
+    #[test]
+    fn a_focus_session_needs_breaks_and_ends_only_when_nothing_is_near() {
+        let mut cfg = Config::default();
+        let start = |apps: &[&str]| Request::FocusStart {
+            apps: apps.iter().map(|a| a.to_string()).collect(),
+        };
+        assert!(!run(&mut cfg, start(&["game"]), at(12, 0)).response.ok);
+        cfg.breaks = Some(BreakPolicy::short(50, 10));
+        assert!(!run(&mut cfg, start(&[]), at(12, 0)).response.ok);
+        assert!(run(&mut cfg, start(&["game"]), at(12, 0)).response.ok);
+        // Adding more keeps what was there and when it started.
+        assert!(
+            run(&mut cfg, start(&["steam", "game"]), at(12, 5))
+                .response
+                .ok
+        );
+        let focus = cfg.focus.clone().unwrap();
+        assert_eq!(focus.apps, vec!["game.exe", "steam.exe"]);
+        assert_eq!(focus.started, at(12, 0));
+        // A break near: it cannot be stopped.
+        let nearly_due = State {
+            usage_secs: 45 * 60,
+            ..State::default()
+        };
+        assert!(
+            !run_with(&mut cfg, &nearly_due, Request::FocusStop, at(12, 0))
+                .response
+                .ok
+        );
+        assert!(run(&mut cfg, Request::FocusStop, at(12, 0)).response.ok);
+        assert_eq!(cfg.focus, None);
+    }
+
+    #[test]
     fn breaks_can_be_tightened_any_time_but_loosened_only_early_in_a_work_period() {
         let mut cfg = Config::default();
         let set = |work_minutes, break_minutes| Request::BreakSet {
             work_minutes,
             break_minutes,
+            long_break_minutes: 0,
+            cycles: 4,
         };
         let fresh = State::default();
         let nearly_due = State {
-            usage_secs: 40 * 60,
+            usage_secs: 46 * 60,
             ..State::default()
         };
         let resting = State {
@@ -996,13 +1166,7 @@ mod tests {
                 .response
                 .ok
         );
-        assert_eq!(
-            cfg.breaks,
-            Some(BreakPolicy {
-                work_minutes: 45,
-                break_minutes: 15
-            })
-        );
+        assert_eq!(cfg.breaks, Some(BreakPolicy::short(45, 15)));
         // Early in the work period it goes through.
         assert!(
             run_with(&mut cfg, &fresh, set(60, 15), at(12, 0))
@@ -1091,6 +1255,8 @@ mod tests {
             Request::BreakSet {
                 work_minutes: 50,
                 break_minutes: 10,
+                long_break_minutes: 0,
+                cycles: 4,
             },
             at(6, 0),
         );

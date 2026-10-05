@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name" translatable="false">despegate</string>
+    <string name="watch_description">despegate uses this to hold you to the blocks you set for yourself: it sees which app comes to the front, puts its lock screen back, and sends blocked apps away. While a block is active or about to start it also closes the settings screens that name despegate. It reads nothing else, keeps nothing, and the app has no access to the network.</string>
+</resources>

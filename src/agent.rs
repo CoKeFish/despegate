@@ -78,6 +78,12 @@ fn challenge(mode: &Mode) -> Option<&str> {
 }
 
 fn show(ui: &mut UiState, view: View) {
+    // A break that ends is heard, so that one can come back without watching the clock.
+    let break_over = matches!(&ui.mode, Mode::Lock(LockView { idea: Some(_), .. }))
+        && !matches!(&view.mode, Mode::Lock(_));
+    if break_over {
+        chime();
+    }
     // What was typed belongs to one challenge; a new one starts from nothing.
     if challenge(&ui.mode).is_none() || challenge(&ui.mode) != challenge(&view.mode) {
         ui.typed.clear();
@@ -85,6 +91,14 @@ fn show(ui: &mut UiState, view: View) {
     ui.lang = Lang::from_code(&view.lang).unwrap_or_default();
     ui.theme = view.theme;
     ui.mode = view.mode;
+}
+
+fn chime() {
+    use windows_sys::Win32::System::Diagnostics::Debug::MessageBeep;
+    use windows_sys::Win32::UI::WindowsAndMessaging::MB_ICONASTERISK;
+    unsafe {
+        MessageBeep(MB_ICONASTERISK);
+    }
 }
 
 #[cfg(test)]
@@ -98,6 +112,7 @@ mod tests {
             media: Vec::new(),
             challenge: challenge.map(str::to_string),
             emergency_minutes: 5,
+            idea: None,
         })
     }
 

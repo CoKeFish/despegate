@@ -38,6 +38,15 @@ done = "{key} set to {value} (was {old})"
 no_emergency_warning = "Warning: with no emergency pause, a mistaken lock rule can only be escaped by waiting it out."
 
 [break]
+set_long = "Breaks on: the screen locks for {rest} min after every {work} min of use, and for {long} min every {cycles} breaks."
+idea_1 = "Stand up and stretch your back and shoulders."
+idea_2 = "Look at something far away for twenty seconds. Then once more."
+idea_3 = "Get a glass of water."
+idea_4 = "Walk around the house, or to the window and back."
+idea_5 = "Close your eyes and take five slow breaths."
+idea_6 = "Roll your neck and your wrists, gently."
+idea_7 = "Tidy one thing near you."
+idea_8 = "Step outside, even for a minute."
 set = "Breaks on: the screen locks for {rest} min after every {work} min of use."
 off = "Breaks turned off."
 
@@ -66,6 +75,11 @@ break_active = "a break is under way until {until}"
 break_imminent = "a break is due after {left} more of use"
 
 [error]
+no_focus = "there is no focus session under way"
+focus_needs_breaks = "a focus session needs the breaks on"
+focus_no_apps = "choose at least one program to keep closed"
+break_long_range = "the long break must be longer than the short one, and at most 3 hours"
+break_cycles_range = "the long break comes every 2 to 12 breaks"
 not_agent = "this request can only come from the agent"
 app_empty = "empty application name"
 app_protected = "{app} is a system process and cannot be blocked"
@@ -101,6 +115,8 @@ daemon_unreachable = "cannot talk to the daemon: {error}"
 no_daemon = "the daemon is not running and the config cannot be changed without it ({error}). If despegate is installed it restarts within seconds; try again."
 
 [status]
+breaks_long = "breaks: {rest} min after every {work} min of use, {long} min every {cycles}; the next after {left} more"
+focus = "focus session: keeping {apps} closed"
 daemon_running = "daemon: running"
 daemon_stopped = "daemon: NOT running (nothing is being enforced; run `despegate install`)"
 paused = "emergency pause until {until}"
@@ -126,6 +142,7 @@ reasons_none = "reasons: not set (write them with `despegate reasons set`)"
 reasons = "reasons:"
 
 [banner]
+focus = "{app} stays closed while you focus"
 paused = "Emergency pause: despegate resumes in {left}"
 blocked = "{app} is blocked until {until}"
 allowance_spent = "{app}: today's time is used up"
@@ -134,6 +151,7 @@ break_soon = "Break in {left}. Find a stopping point."
 allowance_soon = "{app}: {left} left today"
 
 [lock]
+rest_title = "Rest."
 title = "Despégate."
 subtitle = "Blocked until {until}  ·  {left} left"
 until = "Blocked until {until}"
@@ -226,6 +244,8 @@ about = "Lock the screen for a while after every stretch of use"
 long_about = "Lock the screen for a while after every stretch of use.\n\nOnly time at the keyboard or mouse counts. Stepping away on your own for as long as the break lasts counts as taking it."
 
 [cli.break.set.arg]
+long = "Length of the long break, e.g. 20m; without it every break is short"
+cycles = "Every how many breaks the long one comes (default 4)"
 every = "Use allowed between breaks, e.g. 50m"
 rest = "Length of the break, e.g. 10m"
 
@@ -316,6 +336,7 @@ lock = "Lock the screen"
 apps = "Close programs (steam.exe, …)"
 
 [ui.nav]
+focus = "Focus"
 home = "Week"
 rules = "Rules"
 breaks = "Breaks"
@@ -324,6 +345,7 @@ reasons = "Reasons"
 settings = "Settings"
 
 [ui.hero]
+focus = "Focusing."
 stopped = "Not running."
 stopped_detail = "Run: despegate install"
 paused = "Paused."
@@ -419,3 +441,59 @@ status = "Full status"
 unavailable = "No answer from the daemon."
 version = "despegate {version}"
 help = "Guide and source code"
+
+[focus]
+started = "Focus session: while you work, despegate closes {apps}, until the next break."
+started_long = "Focus session: while you work, despegate closes {apps}, until the long break."
+stopped = "Focus session over."
+
+[ui.focus]
+heading = "Focus"
+hint = "Like a pomodoro, but enforced: after a stretch of continuous use the screen locks so that you rest, and every few breaks one is longer. Only time at the keyboard counts, and stepping away for that long on your own counts as the break."
+off = "Breaks are off. Turn them on below, or pick one of the rhythms."
+working = "until the break"
+resting = "of break"
+resting_long = "of long break"
+cycle = "Round {n} of {cycles}"
+next_long = "The next break is the long one"
+used = "{used} of use so far"
+session_heading = "Focus session"
+session_hint = "While you work, the programs you choose stay closed. Breaks let them through, and the session ends on its own at the long break."
+session_hint_short = "While you work, the programs you choose stay closed. The session ends on its own at the next break."
+session_off = "Turn the breaks on to start a session."
+session_apps = "Programs to keep closed (steam.exe, …)"
+start = "Start focusing"
+add = "Add to the session"
+confirm = "It cannot be ended close to a break. Start?"
+on = "Under way: despegate closes {apps} until the long break."
+on_short = "Under way: despegate closes {apps} until the next break."
+stop = "End the session"
+rhythm = "Rhythm"
+toggle = "Enforced breaks"
+work = "Use before each break"
+rest = "Short break"
+long = "Long break"
+long_desc = "0 leaves every break short."
+cycles = "Long break every"
+cycles_unit = "breaks"
+preset_pomodoro = "Pomodoro 25 / 5"
+preset_deep = "Deep work 50 / 10"
+preset_long = "Long stretches 90 / 20"
+history = "History"
+today = "Today: {work} of use, {breaks} breaks."
+streak = "{days} days in a row with breaks."
+streak_one = "1 day with breaks so far."
+streak_none = "Take a break today to start a streak."
+bar = "{day}: {work} of use, {breaks} breaks"
+
+[cli.focus]
+about = "Keep programs closed while working, until the next long break"
+
+[cli.focus.start]
+about = "Start a focus session, or add programs to the one under way"
+
+[cli.focus.start.arg]
+apps = "Program to keep closed (repeatable or comma-separated), e.g. steam.exe"
+
+[cli.focus.stop]
+about = "End the focus session (refused while a block or break is active or near)"

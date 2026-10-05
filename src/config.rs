@@ -48,6 +48,8 @@ pub struct Config {
     pub emergency_minutes: u32,
     /// Forced breaks after a stretch of continuous use.
     pub breaks: Option<BreakPolicy>,
+    /// A focus session under way: programs kept closed while working.
+    pub focus: Option<Focus>,
     /// Daily time budgets for individual programs.
     pub allowances: Vec<Allowance>,
     pub rules: Vec<Rule>,
@@ -66,6 +68,7 @@ impl Default for Config {
             emergency_chars: 80,
             emergency_minutes: 5,
             breaks: None,
+            focus: None,
             allowances: Vec::new(),
             rules: Vec::new(),
             oneoffs: Vec::new(),
@@ -75,10 +78,45 @@ impl Default for Config {
 
 /// After `work_minutes` of use without a proper rest, the screen locks for
 /// `break_minutes`. Stepping away for that long on your own counts as the break.
+/// Every `cycles`-th break lasts `long_break_minutes` instead, as in a
+/// pomodoro; 0 leaves every break short.
 #[derive(Serialize, Deserialize, Clone, Copy, Debug, PartialEq)]
 pub struct BreakPolicy {
     pub work_minutes: u32,
     pub break_minutes: u32,
+    #[serde(default)]
+    pub long_break_minutes: u32,
+    #[serde(default = "default_cycles")]
+    pub cycles: u32,
+}
+
+pub fn default_cycles() -> u32 {
+    4
+}
+
+impl BreakPolicy {
+    /// Breaks of one length, without a long one.
+    pub fn short(work_minutes: u32, break_minutes: u32) -> Self {
+        BreakPolicy {
+            work_minutes,
+            break_minutes,
+            long_break_minutes: 0,
+            cycles: default_cycles(),
+        }
+    }
+
+    /// Whether every so many breaks one is long.
+    pub fn has_long(&self) -> bool {
+        self.long_break_minutes > 0 && self.cycles > 1
+    }
+}
+
+/// Programs kept closed while working, until the next long break. Breaks
+/// let them through.
+#[derive(Serialize, Deserialize, Clone, Debug, PartialEq)]
+pub struct Focus {
+    pub apps: Vec<String>,
+    pub started: NaiveDateTime,
 }
 
 /// `app` may be in the foreground for `minutes` per day; after that it is
@@ -309,6 +347,12 @@ mod tests {
             breaks: Some(BreakPolicy {
                 work_minutes: 50,
                 break_minutes: 10,
+                long_break_minutes: 25,
+                cycles: 4,
+            }),
+            focus: Some(Focus {
+                apps: vec!["game.exe".into()],
+                started: at(5, 9, 0),
             }),
             ..Config::default()
         };

@@ -321,6 +321,7 @@ mod tests {
             media: vec!["family.png".into(), "clip.mp4".into(), "notes.txt".into()],
             challenge: Some("abcde".into()),
             emergency_minutes: 5,
+            idea: None,
         };
         let html = lock_page(&view, Lang::EN, "dark");
         assert!(html.contains("2026-10-02T23:00:00"));

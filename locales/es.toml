@@ -37,6 +37,15 @@ done = "{key} ahora vale {value} (antes {old})"
 no_emergency_warning = "Aviso: sin pausa de emergencia, de una regla de bloqueo mal puesta solo se sale esperando a que termine."
 
 [break]
+set_long = "Descansos activados: la pantalla se bloquea {rest} min tras cada {work} min de uso, y {long} min cada {cycles} descansos."
+idea_1 = "Ponte de pie y estira la espalda y los hombros."
+idea_2 = "Mira algo lejano durante veinte segundos. Y otra vez."
+idea_3 = "Sírvete un vaso de agua."
+idea_4 = "Da una vuelta por la casa, o ve a la ventana y vuelve."
+idea_5 = "Cierra los ojos y respira lento cinco veces."
+idea_6 = "Mueve el cuello y las muñecas, con suavidad."
+idea_7 = "Ordena una cosa que tengas cerca."
+idea_8 = "Sal afuera, aunque sea un minuto."
 set = "Descansos activados: la pantalla se bloquea {rest} min tras cada {work} min de uso."
 off = "Descansos desactivados."
 
@@ -65,6 +74,11 @@ break_active = "hay un descanso en curso hasta las {until}"
 break_imminent = "toca descanso tras {left} más de uso"
 
 [error]
+no_focus = "no hay ninguna sesión de enfoque en marcha"
+focus_needs_breaks = "una sesión de enfoque necesita los descansos activados"
+focus_no_apps = "elige al menos un programa que mantener cerrado"
+break_long_range = "el descanso largo debe durar más que el corto, y como mucho 3 horas"
+break_cycles_range = "el descanso largo llega cada 2 a 12 descansos"
 not_agent = "esta petición solo puede venir del agente"
 app_empty = "nombre de aplicación vacío"
 app_protected = "{app} es un proceso del sistema y no se puede bloquear"
@@ -100,6 +114,8 @@ daemon_unreachable = "no se puede hablar con el daemon: {error}"
 no_daemon = "el daemon no está en marcha y sin él no se puede cambiar la configuración ({error}). Si despegate está instalado, se reinicia en unos segundos; inténtalo de nuevo."
 
 [status]
+breaks_long = "descansos: {rest} min tras cada {work} min de uso, {long} min cada {cycles}; el próximo tras {left} más"
+focus = "sesión de enfoque: cerrando {apps}"
 daemon_running = "daemon: en marcha"
 daemon_stopped = "daemon: PARADO (no se está aplicando nada; ejecuta `despegate install`)"
 paused = "pausa de emergencia hasta las {until}"
@@ -125,6 +141,7 @@ reasons_none = "razones: sin escribir (hazlo con `despegate reasons set`)"
 reasons = "razones:"
 
 [banner]
+focus = "{app} queda cerrado mientras te enfocas"
 paused = "Pausa de emergencia: despegate vuelve en {left}"
 blocked = "{app} está bloqueado hasta las {until}"
 allowance_spent = "{app}: se acabó el tiempo de hoy"
@@ -133,6 +150,7 @@ break_soon = "Descanso en {left}. Busca un buen punto para parar."
 allowance_soon = "{app}: quedan {left} hoy"
 
 [lock]
+rest_title = "Descansa."
 title = "Despégate."
 subtitle = "Bloqueado hasta las {until}  ·  faltan {left}"
 until = "Bloqueado hasta las {until}"
@@ -225,6 +243,8 @@ about = "Bloquea la pantalla un rato tras cada tramo de uso"
 long_about = "Bloquea la pantalla un rato tras cada tramo de uso.\n\nSolo cuenta el tiempo con teclado o ratón. Levantarte por tu cuenta durante lo que dura el descanso cuenta como haberlo tomado."
 
 [cli.break.set.arg]
+long = "Duración del descanso largo, p. ej. 20m; sin ella todos los descansos son cortos"
+cycles = "Cada cuántos descansos llega el largo (4 por defecto)"
 every = "Uso permitido entre descansos, p. ej. 50m"
 rest = "Duración del descanso, p. ej. 10m"
 
@@ -315,6 +335,7 @@ lock = "Bloquear la pantalla"
 apps = "Cerrar programas (steam.exe, …)"
 
 [ui.nav]
+focus = "Enfoque"
 home = "Semana"
 rules = "Reglas"
 breaks = "Descansos"
@@ -323,6 +344,7 @@ reasons = "Razones"
 settings = "Ajustes"
 
 [ui.hero]
+focus = "Enfocado."
 stopped = "No está en marcha."
 stopped_detail = "Ejecuta: despegate install"
 paused = "En pausa."
@@ -418,3 +440,59 @@ status = "Estado completo"
 unavailable = "El daemon no responde."
 version = "despegate {version}"
 help = "Guía y código"
+
+[focus]
+started = "Sesión de enfoque: mientras trabajas, despegate cierra {apps}, hasta el próximo descanso."
+started_long = "Sesión de enfoque: mientras trabajas, despegate cierra {apps}, hasta el descanso largo."
+stopped = "Sesión de enfoque terminada."
+
+[ui.focus]
+heading = "Enfoque"
+hint = "Como un pomodoro, pero obligado: tras un rato de uso seguido la pantalla se bloquea para que descanses, y cada pocos descansos uno es más largo. Solo cuenta el tiempo frente al teclado, y alejarte ese rato por tu cuenta vale como descanso."
+off = "Los descansos están apagados. Actívalos aquí abajo, o elige uno de los ritmos."
+working = "hasta el descanso"
+resting = "de descanso"
+resting_long = "de descanso largo"
+cycle = "Ronda {n} de {cycles}"
+next_long = "El próximo descanso es el largo"
+used = "Llevas {used} de uso"
+session_heading = "Sesión de enfoque"
+session_hint = "Mientras trabajas, los programas que elijas quedan cerrados. Los descansos los dejan pasar, y la sesión termina sola en el descanso largo."
+session_hint_short = "Mientras trabajas, los programas que elijas quedan cerrados. La sesión termina sola en el próximo descanso."
+session_off = "Activa los descansos para empezar una sesión."
+session_apps = "Programas a mantener cerrados (steam.exe, …)"
+start = "Empezar a enfocarme"
+add = "Añadir a la sesión"
+confirm = "No se puede terminar cerca de un descanso. ¿Empezar?"
+on = "En marcha: despegate cierra {apps} hasta el descanso largo."
+on_short = "En marcha: despegate cierra {apps} hasta el próximo descanso."
+stop = "Terminar la sesión"
+rhythm = "Ritmo"
+toggle = "Descansos obligados"
+work = "Uso antes de cada descanso"
+rest = "Descanso corto"
+long = "Descanso largo"
+long_desc = "0 deja todos los descansos cortos."
+cycles = "Descanso largo cada"
+cycles_unit = "descansos"
+preset_pomodoro = "Pomodoro 25 / 5"
+preset_deep = "Trabajo profundo 50 / 10"
+preset_long = "Bloques largos 90 / 20"
+history = "Historial"
+today = "Hoy: {work} de uso, {breaks} descansos."
+streak = "{days} días seguidos descansando."
+streak_one = "1 día descansando, por ahora."
+streak_none = "Toma un descanso hoy para empezar una racha."
+bar = "{day}: {work} de uso, {breaks} descansos"
+
+[cli.focus]
+about = "Mantener programas cerrados mientras trabajas, hasta el próximo descanso largo"
+
+[cli.focus.start]
+about = "Empieza una sesión de enfoque, o añade programas a la que está en marcha"
+
+[cli.focus.start.arg]
+apps = "Programa a mantener cerrado (repetible o separado por comas), p. ej. steam.exe"
+
+[cli.focus.stop]
+about = "Termina la sesión de enfoque (se rechaza si hay un bloqueo o descanso activo o cerca)"

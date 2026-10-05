@@ -12,7 +12,7 @@ Normal reminders are easy to dismiss when you are deep into a game or any other 
 
 ## Status
 
-The Windows desktop version works. It is young; expect rough edges. A mobile companion is still only an idea.
+The Windows desktop version works. It is young; expect rough edges. An Android version lives in [`android/`](android/README.md): a separate app with the same rules and the same look, which takes over the phone as its device owner. It is newer still.
 
 ## What it does
 
@@ -63,6 +63,12 @@ despegate now --for 45m --lock
 # A 10 minute break after every 50 minutes of use.
 despegate break set --every 50m --for 10m
 
+# A pomodoro: 5 minutes after every 25, and 15 minutes every fourth break.
+despegate break set --every 25m --for 5m --long 15m --cycles 4
+
+# Keep Discord closed while working, until the long break.
+despegate focus start --app discord.exe
+
 # One hour of Hearthstone a day.
 despegate allowance set hearthstone.exe 60m
 
@@ -71,7 +77,7 @@ despegate status
 
 `--days` takes `all`, `weekdays`, `weekends`, a range like `mon-fri`, or a list like `mon,wed,sat`. A rule can combine `--lock` and `--app`. Every command explains itself with `--help`.
 
-The same things can be done from the settings window (`despegate ui`). It opens on the week: a timetable with every rule painted on it and a mark at the current moment, so one glance says when despegate will next step in. Settings apply as soon as they are changed; what cannot be undone asks once. Everything the window does is a CLI command underneath, so the two never disagree.
+The same things can be done from the settings window (`despegate ui`). It opens on the week: a timetable with every rule painted on it and a mark at the current moment, so one glance says when despegate will next step in. The Focus page is the pomodoro side: a live countdown to the next break, the round of the cycle, the focus session, and the use and breaks of the last seven days. Settings apply as soon as they are changed; what cannot be undone asks once. Everything the window does is a CLI command underneath, so the two never disagree.
 
 ### What can be changed, and when
 

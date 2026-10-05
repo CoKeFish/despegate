@@ -50,6 +50,9 @@ enum Command {
     /// Forced breaks after a stretch of continuous use
     #[command(subcommand)]
     Break(BreakCommand),
+    /// Keep programs closed while working, until the next long break
+    #[command(subcommand)]
+    Focus(FocusCommand),
     /// Daily time budgets for individual programs
     #[command(subcommand)]
     Allowance(AllowanceCommand),
@@ -116,9 +119,32 @@ enum BreakCommand {
         /// Length of the break, e.g. 10m
         #[arg(long = "for", value_name = "DURATION", value_parser = parse_duration)]
         rest: u32,
+        /// Length of the long break, e.g. 20m; without it every break is short
+        #[arg(long, value_name = "DURATION", value_parser = parse_duration)]
+        long: Option<u32>,
+        /// Every how many breaks the long one comes
+        #[arg(long, default_value_t = 4)]
+        cycles: u32,
     },
     /// Turn forced breaks off
     Off,
+}
+
+#[derive(Subcommand)]
+enum FocusCommand {
+    /// Start a focus session (or add programs to the one under way)
+    Start {
+        /// Program to keep closed (repeatable or comma-separated), e.g. steam.exe
+        #[arg(
+            long = "app",
+            value_name = "EXE",
+            value_delimiter = ',',
+            required = true
+        )]
+        apps: Vec<String>,
+    },
+    /// End the focus session (refused while a block or break is active or near)
+    Stop,
 }
 
 #[derive(Subcommand)]
@@ -357,10 +383,19 @@ fn main() -> ExitCode {
             lock,
             apps,
         },
-        Command::Break(BreakCommand::Set { every, rest }) => Request::BreakSet {
+        Command::Break(BreakCommand::Set {
+            every,
+            rest,
+            long,
+            cycles,
+        }) => Request::BreakSet {
             work_minutes: every,
             break_minutes: rest,
+            long_break_minutes: long.unwrap_or(0),
+            cycles,
         },
+        Command::Focus(FocusCommand::Start { apps }) => Request::FocusStart { apps },
+        Command::Focus(FocusCommand::Stop) => Request::FocusStop,
         Command::Break(BreakCommand::Off) => Request::BreakOff,
         Command::Allowance(AllowanceCommand::Set { app, minutes }) => {
             Request::AllowanceSet { app, minutes }

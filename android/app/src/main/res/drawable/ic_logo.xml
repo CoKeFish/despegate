@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- The sticker with its corner let go, placed inside the safe area of the launcher icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <group
+        android:scaleX="0.195"
+        android:scaleY="0.195"
+        android:translateX="30"
+        android:translateY="27">
+        <path
+            android:fillColor="@color/sol"
+            android:pathData="M26 40H122a16 16 0 0 1 11 5L216 126V230a26 26 0 0 1-26 26H26A26 26 0 0 1 0 230V66A26 26 0 0 1 26 40Z" />
+        <group
+            android:pivotX="0"
+            android:pivotY="86"
+            android:rotation="-12"
+            android:translateX="152"
+            android:translateY="18">
+            <path
+                android:fillColor="@color/sol"
+                android:pathData="M8 0H78a8 8 0 0 1 8 8V78a8 8 0 0 1-8 8L0 8A8 8 0 0 1 8 0Z" />
+        </group>
+    </group>
+</vector>
