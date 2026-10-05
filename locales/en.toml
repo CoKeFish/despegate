@@ -497,3 +497,13 @@ apps = "Program to keep closed (repeatable or comma-separated), e.g. steam.exe"
 
 [cli.focus.stop]
 about = "End the focus session (refused while a block or break is active or near)"
+
+[ui.widget]
+off_hint = "Double-click to turn them on."
+button = "Floating widget"
+hint = "A small window that stays on top of the others, with the countdown to the next break. Drag it anywhere; it opens again when you sign in to Windows, until you switch it off."
+open = "Open despegate"
+close = "Switch the widget off"
+off = "Breaks are off"
+next_long = "Long break next"
+focusing = "Focusing"

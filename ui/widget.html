@@ -1,0 +1,135 @@
+<!doctype html>
+<html lang="__LANG__"__THEME__>
+<head>
+<meta charset="utf-8">
+<title>despegate</title>
+<style>__FONT__</style>
+<style>
+  /* The Focus timer, small enough to stay on screen: the sticker yellow while
+     working, the night while resting. The whole window is the widget. */
+  :root { --sol: #f5b800; --ink: #1d1b45; --night: #1d1b45; --moon: #eeedfb; --off-bg: #f1f1f6; --off-fg: #5d5b80; color-scheme: light; }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) { --night: #eeedfb; --moon: #1d1b45; --off-bg: #1c1b42; --off-fg: #a6a4cb; color-scheme: dark; }
+  }
+  :root[data-theme="dark"] { --night: #eeedfb; --moon: #1d1b45; --off-bg: #1c1b42; --off-fg: #a6a4cb; color-scheme: dark; }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; height: 100%; overflow: hidden; user-select: none; cursor: default; }
+  body { font: 600 14px/1.2 Gabarito, "Segoe UI", system-ui, sans-serif; -webkit-font-smoothing: antialiased; font-variant-numeric: tabular-nums; }
+  #w { height: 100%; padding: 10px 14px 0; display: grid; grid-template-rows: 1fr auto auto; background: var(--sol); color: var(--ink); transition: background-color 300ms ease, color 300ms ease; }
+  #w[data-phase="rest"], #w[data-phase="long"] { background: var(--night); color: var(--moon); }
+  #w[data-phase="off"] { background: var(--off-bg); color: var(--off-fg); }
+  #w[data-phase="off"] .top { align-items: center; }
+  #w[data-phase="off"] #label { font-size: 17px; color: var(--ink); }
+  :root[data-theme="dark"] #w[data-phase="off"] #label { color: #eeedfb; }
+  @media (prefers-color-scheme: dark) { :root:not([data-theme="light"]) #w[data-phase="off"] #label { color: #eeedfb; } }
+  .top { display: flex; align-items: baseline; gap: 10px; min-width: 0; }
+  #left { font-size: 34px; line-height: 1; font-weight: 800; letter-spacing: -0.03em; }
+  #label { font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bottom { display: flex; align-items: center; gap: 8px; padding: 6px 0 8px; white-space: nowrap; overflow: hidden; }
+  .dots { display: inline-flex; gap: 4px; }
+  .dots i { width: 9px; height: 9px; border-radius: 50%; border: 1.5px solid currentColor; }
+  .dots i.on { background: currentColor; }
+  .dots i.long { width: 16px; border-radius: 5px; }
+  #focus { margin-left: auto; padding: 1px 8px; border-radius: 999px; background: currentColor; }
+  #focus span { color: var(--sol); font-size: 12px; font-weight: 700; }
+  #w[data-phase="rest"] #focus span, #w[data-phase="long"] #focus span { color: var(--night); }
+  .bar { height: 4px; margin: 0 -14px; background: color-mix(in srgb, currentColor 18%, transparent); }
+  .bar i { display: block; height: 100%; background: currentColor; transform-origin: left; transform: scaleX(var(--done, 0)); transition: transform 1s linear; }
+  /* Open and close appear under the pointer, not before. */
+  .tools { position: absolute; top: 6px; right: 6px; display: flex; gap: 2px; opacity: 0; transition: opacity 150ms ease; }
+  body:hover .tools { opacity: 1; }
+  .tools button { width: 26px; height: 26px; padding: 0; border: 0; border-radius: 8px; background: color-mix(in srgb, currentColor 14%, transparent); color: inherit; display: grid; place-items: center; }
+  .tools button:hover { background: color-mix(in srgb, currentColor 26%, transparent); }
+  .tools svg { width: 14px; height: 14px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; }
+  #w { position: relative; }
+</style>
+</head>
+<body>
+<div id="w" data-phase="off">
+  <div class="top"><span id="left">&nbsp;</span><span id="label"></span></div>
+  <div class="bottom"><span class="dots" id="dots"></span><span id="round"></span><span id="focus" hidden><span></span></span></div>
+  <div class="bar"><i></i></div>
+  <div class="tools">
+    <button type="button" id="open" aria-label=""><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3H3v10h10v-3M9 3h4v4M13 3 7 9"/></svg></button>
+    <button type="button" id="close" aria-label=""><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 4l8 8M12 4l-8 8"/></svg></button>
+  </div>
+</div>
+<script>
+  const T = __I18N__;
+  const t = (key, vars = {}) => (T[key] ?? key).replace(/\{(\w+)\}/g, (_, name) => vars[name] ?? `{${name}}`);
+  const $ = (id) => document.getElementById(id);
+  const tell = (message) => window.ipc.postMessage(JSON.stringify(message));
+  $("open").setAttribute("aria-label", t("ui.widget.open"));
+  $("close").setAttribute("aria-label", t("ui.widget.close"));
+  $("open").title = t("ui.widget.open");
+  $("close").title = t("ui.widget.close");
+  $("open").onclick = () => tell({ kind: "open" });
+  $("close").onclick = () => tell({ kind: "close" });
+  // The whole widget is the handle to move it: the page follows the pointer and
+  // tells the window how far to go. A double click opens despegate.
+  let grab = null;
+  document.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0 || e.target.closest("button")) return;
+    grab = { x: e.screenX, y: e.screenY };
+    document.body.setPointerCapture(e.pointerId);
+  });
+  document.addEventListener("pointermove", (e) => {
+    if (!grab) return;
+    const dx = e.screenX - grab.x, dy = e.screenY - grab.y;
+    if (!dx && !dy) return;
+    grab = { x: e.screenX, y: e.screenY };
+    tell({ kind: "move", dx: dx * devicePixelRatio, dy: dy * devicePixelRatio });
+  });
+  const release = () => { grab = null; };
+  document.addEventListener("pointerup", release);
+  document.addEventListener("pointercancel", release);
+  document.addEventListener("dblclick", (e) => { if (!e.target.closest("button")) tell({ kind: "open" }); });
+
+  function render(f) {
+    const w = $("w");
+    if (!f) {
+      w.dataset.phase = "off";
+      $("left").textContent = "";
+      $("label").textContent = t("ui.widget.off");
+      $("dots").replaceChildren();
+      $("round").textContent = t("ui.widget.off_hint");
+      $("focus").hidden = true;
+      w.style.setProperty("--done", 0);
+      return;
+    }
+    w.dataset.phase = f.phase;
+    $("left").textContent = f.left;
+    $("label").textContent = t({ work: "ui.focus.working", rest: "ui.focus.resting", long: "ui.focus.resting_long" }[f.phase]);
+    w.style.setProperty("--done", f.total_secs ? 1 - f.left_secs / f.total_secs : 0);
+    $("dots").replaceChildren();
+    if (f.has_long) {
+      const done = f.phase === "long" ? f.cycles : f.cycle;
+      for (let i = 0; i < f.cycles; i++) {
+        const dot = document.createElement("i");
+        dot.classList.toggle("on", i < done);
+        dot.classList.toggle("long", i === f.cycles - 1);
+        $("dots").append(dot);
+      }
+      $("round").textContent = f.phase === "work" && f.next_long ? t("ui.widget.next_long")
+        : t("ui.focus.cycle", { n: Math.min(f.cycle + (f.phase === "work" ? 1 : 0), f.cycles), cycles: f.cycles });
+    } else {
+      $("round").textContent = t("ui.focus.used", { used: f.used });
+    }
+    $("focus").hidden = !f.session;
+    $("focus").firstChild.textContent = t("ui.widget.focusing");
+  }
+
+  // Asked every second; the daemon counts, the widget only shows.
+  const pending = new Map();
+  let seq = 0;
+  window.__reply = (reply) => { const resolve = pending.get(reply.id); pending.delete(reply.id); if (resolve) resolve(reply); };
+  const ask = (message) => new Promise((resolve) => { const id = ++seq; pending.set(id, resolve); tell({ id, ...message }); });
+  async function beat() {
+    const reply = await ask({ kind: "pulse" });
+    if (reply.pulse) render(reply.pulse.focus);
+  }
+  beat();
+  setInterval(beat, 1000);
+</script>
+</body>
+</html>

@@ -27,6 +27,9 @@ enum Reply {
     /// Files dropped on the window.
     Dropped(Vec<PathBuf>),
     Dragging(bool),
+    /// The widget is being moved with the mouse, by this many pixels.
+    Move(f64, f64),
+    Close,
 }
 
 /// The native "open file" dialog, for photos and videos. Returns the chosen
@@ -65,19 +68,180 @@ fn pick_files(
     }
 }
 
+/// Starts another despegate-ui with `extra` arguments, keeping `--home`.
+fn spawn_self(paths: &Paths, extra: &[&str]) {
+    if let Ok(exe) = std::env::current_exe() {
+        let _ = std::process::Command::new(exe)
+            .args(paths.args())
+            .args(extra)
+            .spawn();
+    }
+}
+
+/// Where the widget was last left on screen, kept with the agent's files.
+fn widget_spot(paths: &Paths) -> PathBuf {
+    paths.agent_log().with_file_name("widget.json")
+}
+
+/// The floating widget: a small window on top of the others that shows the
+/// countdown to the next break. Only one runs at a time.
+fn widget(paths: Paths, lang: despegate::i18n::Lang, appearance: String) {
+    use tao::dpi::PhysicalPosition;
+    use tao::platform::windows::WindowBuilderExtWindows;
+    use windows_sys::Win32::Foundation::{ERROR_ALREADY_EXISTS, GetLastError};
+    use windows_sys::Win32::System::Threading::CreateMutexW;
+
+    // One widget per user and per data directory.
+    let name = despegate::wide(
+        &paths
+            .mutex()
+            .replace("Global\\", "Local\\")
+            .replace("daemon", "widget"),
+    );
+    // Leaked on purpose: it marks this process as the widget until it exits.
+    let mutex = unsafe { CreateMutexW(std::ptr::null(), 0, name.as_ptr()) };
+    if mutex.is_null() || unsafe { GetLastError() } == ERROR_ALREADY_EXISTS {
+        return;
+    }
+
+    let event_loop = EventLoopBuilder::<Reply>::with_user_event().build();
+    let spot: Option<(i32, i32)> = std::fs::read_to_string(widget_spot(&paths))
+        .ok()
+        .and_then(|text| serde_json::from_str(&text).ok());
+    let mut builder = WindowBuilder::new()
+        .with_title(tr!(lang, "ui.title"))
+        .with_window_icon(Icon::from_resource(1, None).ok())
+        .with_inner_size(LogicalSize::new(290.0, 84.0))
+        .with_resizable(false)
+        .with_decorations(false)
+        .with_always_on_top(true)
+        .with_skip_taskbar(true);
+    match spot {
+        Some((x, y)) => builder = builder.with_position(PhysicalPosition::new(x, y)),
+        None => {
+            // The first time: the bottom right corner of the main screen, above the taskbar.
+            if let Some(screen) = event_loop.primary_monitor() {
+                let scale = screen.scale_factor();
+                let size = screen.size();
+                let x = size.width as f64 - (290.0 + 24.0) * scale;
+                let y = size.height as f64 - (84.0 + 72.0) * scale;
+                builder = builder.with_position(PhysicalPosition::new(x as i32, y as i32));
+            }
+        }
+    }
+    let window = builder
+        .build(&event_loop)
+        .expect("cannot create the widget");
+    let hwnd = match window.window_handle().map(|h| h.as_raw()) {
+        Ok(RawWindowHandle::Win32(handle)) => {
+            handle.hwnd.get() as windows_sys::Win32::Foundation::HWND
+        }
+        _ => std::ptr::null_mut(),
+    };
+    web::round_corners(&web::Parent(hwnd));
+
+    let mut context = web::context(&paths, "webview-widget");
+    let proxy = event_loop.create_proxy();
+    let bridge_paths = paths.clone();
+    let open_paths = paths.clone();
+    let webview = WebViewBuilder::new_with_web_context(&mut context)
+        .with_html(ui::widget_page(&paths, lang))
+        .with_background_color(if web::is_dark(&appearance) {
+            web::DARK_BG
+        } else {
+            web::LIGHT_BG
+        })
+        .with_initialization_script(web::PAGE_SCRIPT)
+        .with_ipc_handler(move |request| {
+            let message = request.body().clone();
+            let parsed: serde_json::Value = serde_json::from_str(&message).unwrap_or_default();
+            match parsed.get("kind").and_then(|kind| kind.as_str()) {
+                Some("move") => {
+                    let by = |axis: &str| parsed.get(axis).and_then(|v| v.as_f64()).unwrap_or(0.0);
+                    let _ = proxy.send_event(Reply::Move(by("dx"), by("dy")));
+                }
+                Some("open") => spawn_self(&open_paths, &[]),
+                // Closing it is switching it off, so it does not come back at the next sign-in.
+                Some("close") => {
+                    let _ = ui::set_widget_autostart(false);
+                    let _ = proxy.send_event(Reply::Close);
+                }
+                _ => {
+                    let paths = bridge_paths.clone();
+                    let proxy = proxy.clone();
+                    std::thread::spawn(move || {
+                        // Switched off from the settings window: it goes.
+                        if !ui::widget_autostart() {
+                            let _ = proxy.send_event(Reply::Close);
+                            return;
+                        }
+                        let _ = proxy.send_event(Reply::Answer(ui::handle(&paths, &message)));
+                    });
+                }
+            }
+        })
+        .build(&window)
+        .expect("cannot create the web view (is the WebView2 runtime installed?)");
+
+    let mut webview = Some(webview);
+    event_loop.run(move |event, _, control_flow| {
+        *control_flow = ControlFlow::Wait;
+        match event {
+            Event::WindowEvent {
+                event: WindowEvent::CloseRequested,
+                ..
+            }
+            | Event::UserEvent(Reply::Close) => {
+                let _ = webview.take();
+                *control_flow = ControlFlow::Exit;
+            }
+            Event::WindowEvent {
+                event: WindowEvent::Moved(at),
+                ..
+            } => {
+                let _ = std::fs::write(
+                    widget_spot(&paths),
+                    serde_json::json!([at.x, at.y]).to_string(),
+                );
+            }
+            Event::UserEvent(Reply::Move(dx, dy)) => {
+                if let Ok(at) = window.outer_position() {
+                    window.set_outer_position(PhysicalPosition::new(
+                        at.x + dx.round() as i32,
+                        at.y + dy.round() as i32,
+                    ));
+                }
+            }
+            Event::UserEvent(Reply::Answer(json)) => {
+                if let Some(webview) = &webview {
+                    let _ = webview.evaluate_script(&format!("window.__reply({json})"));
+                }
+            }
+            _ => {}
+        }
+    });
+}
+
 fn main() {
-    // Usage: despegate-ui [--home DIR]
+    // Usage: despegate-ui [--home DIR] [--widget]
     let mut args = std::env::args().skip(1);
     let mut home = None;
+    let mut as_widget = false;
     while let Some(arg) = args.next() {
-        if arg == "--home" {
-            home = args.next().map(PathBuf::from);
+        match arg.as_str() {
+            "--home" => home = args.next().map(PathBuf::from),
+            "--widget" => as_widget = true,
+            _ => {}
         }
     }
     let paths = Paths::new(home);
     let lang = ui::language(&paths);
     let appearance =
         despegate::store::Store::<despegate::config::Config>::peek(&paths.config()).appearance;
+    if as_widget {
+        widget(paths, lang, appearance);
+        return;
+    }
 
     let event_loop = EventLoopBuilder::<Reply>::with_user_event().build();
     let window = WindowBuilder::new()
@@ -102,6 +266,7 @@ fn main() {
     let drop_proxy = proxy.clone();
     let bridge_paths = paths.clone();
     let media_paths = paths.clone();
+    let widget_paths = paths.clone();
     let webview = WebViewBuilder::new_with_web_context(&mut context)
         .with_html(ui::page(&paths, lang))
         .with_background_color(if web::is_dark(&appearance) {
@@ -140,6 +305,21 @@ fn main() {
                 Some("theme") => {
                     let dark = parsed.get("dark").and_then(|dark| dark.as_bool());
                     web::dress_frame(&web::Parent(hwnd), dark.unwrap_or(false));
+                }
+                // The widget's switch: on opens it now and at every sign-in; off
+                // closes it (it notices within a second) and stops it coming back.
+                Some("widget_set") => {
+                    let on = parsed
+                        .get("on")
+                        .and_then(|on| on.as_bool())
+                        .unwrap_or(false);
+                    let id = parsed.get("id").cloned().unwrap_or_default();
+                    let ok = ui::set_widget_autostart(on).is_ok();
+                    if ok && on {
+                        spawn_self(&widget_paths, &["--widget"]);
+                    }
+                    let reply = serde_json::json!({ "id": id, "ok": ok }).to_string();
+                    let _ = proxy.send_event(Reply::Answer(reply));
                 }
                 // The file dialog must run on this thread; it pumps messages itself.
                 Some("pick") => {
@@ -191,6 +371,7 @@ fn main() {
                             )
                         }
                         Reply::Dragging(over) => format!("window.__dragging({over})"),
+                        Reply::Move(..) | Reply::Close => return,
                     };
                     let _ = webview.evaluate_script(&script);
                 }

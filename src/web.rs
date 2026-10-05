@@ -58,6 +58,23 @@ pub fn dress_frame(window: &Parent, dark: bool) {
     set(DWMWA_BORDER_COLOR, border);
 }
 
+/// Asks Windows 11 to round a window's corners, which a window without a
+/// frame does not get by itself. Older versions ignore the request.
+pub fn round_corners(window: &Parent) {
+    use windows_sys::Win32::Graphics::Dwm::{
+        DWMWA_WINDOW_CORNER_PREFERENCE, DWMWCP_ROUND, DwmSetWindowAttribute,
+    };
+    let value = DWMWCP_ROUND;
+    unsafe {
+        DwmSetWindowAttribute(
+            window.0,
+            DWMWA_WINDOW_CORNER_PREFERENCE as u32,
+            (&raw const value).cast(),
+            size_of_val(&value) as u32,
+        );
+    }
+}
+
 /// A window of ours, for wry to put a web view inside.
 pub struct Parent(pub HWND);
 

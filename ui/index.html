@@ -294,6 +294,9 @@
   .timer .dots i.on { background: currentColor; }
   .timer .dots i.long { width: 22px; border-radius: 6px; }
   .session-on { margin: 0 0 14px; font-weight: 700; }
+  .widget-row { margin: 20px 0 8px; padding: 18px 20px; border-radius: 18px; border: 1.5px dashed var(--edge); }
+  .widget-row .title { font-weight: 700; }
+  .widget-row .hint { margin: 8px 0 0 56px; }
   .rhythm h2 { margin-top: 8px; }
   .rhythm .presets { margin: 0 0 12px; }
   .rhythm .setting.off .text { opacity: 0.5; }
@@ -342,7 +345,9 @@
     #focus .timer { grid-column: 1; grid-row: 3; }
     #focus .session { grid-column: 2; grid-row: 3; margin-top: 0; }
     #focus .rhythm { grid-column: 1; grid-row: 4; }
-    #focus .history { grid-column: 2; grid-row: 4; }
+    #focus .history { grid-column: 2; grid-row: 5; }
+    #focus .widget-row { grid-column: 2; grid-row: 4; margin-top: 0; }
+    #focus .rhythm { grid-row: 4 / span 2; }
     .timer .clock span:first-child { font-size: 112px; }
   }
 
@@ -490,6 +495,11 @@
         <div class="text"><div class="title" id="breaks-cycles-title" data-t="ui.focus.cycles"></div></div>
         <div class="control"><input type="number" id="breaks-cycles" min="2" max="12" value="4" aria-labelledby="breaks-cycles-title"><span class="unit" data-t="ui.focus.cycles_unit"></span></div>
       </div>
+    </div>
+
+    <div class="widget-row" id="widget-row">
+      <label class="check"><span class="switch"><input type="checkbox" id="widget-on"><span></span></span><span class="title" data-t="ui.widget.button"></span></label>
+      <p class="hint" data-t="ui.widget.hint"></p>
     </div>
 
     <div class="history" id="history">
@@ -878,6 +888,12 @@
   breaksOn.onchange = applyBreaks;
   for (const field of [every, rest, longBreak, cycles]) field.onchange = () => breaksOn.checked && applyBreaks();
 
+  // --- the floating widget
+  $("#widget-on").onchange = async (e) => {
+    const reply = await ask({ kind: "widget_set", on: e.target.checked });
+    if (!reply.ok) e.target.checked = !e.target.checked;
+  };
+
   // --- the focus session
   $("#session-form").onsubmit = (e) => {
     e.preventDefault();
@@ -1124,6 +1140,7 @@
     }
     syncRhythm(b);
     renderFocus(state.focus);
+    if (document.activeElement !== $("#widget-on")) $("#widget-on").checked = state.widget_autostart;
 
     const allowances = $("#allowances-list");
     allowances.replaceChildren();

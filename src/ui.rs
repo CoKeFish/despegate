@@ -131,6 +131,7 @@ fn state(paths: &Paths) -> Value {
         "allowance_left": left,
         "media": media,
         "appearance": config.appearance,
+        "widget_autostart": widget_autostart(),
         "headline": headline(&config, &state, daemon, paused, lang),
         "focus": focus(&config, &state, now, lang),
         "status": status.map(|r| r.message).unwrap_or_default(),
@@ -297,6 +298,58 @@ fn run_cli(paths: &Paths, args: &[String]) -> CliReply {
             text: e.to_string(),
         },
     }
+}
+
+/// Where Windows is told what to start at sign-in, for this user only.
+const RUN_KEY: &str = r"Software\Microsoft\Windows\CurrentVersion\Run";
+const WIDGET_VALUE: &str = "despegate-widget";
+
+/// Whether the widget is switched on: it is open, and opens again when this
+/// user signs in. Switching it off closes it within a second.
+pub fn widget_autostart() -> bool {
+    use winreg::RegKey;
+    use winreg::enums::HKEY_CURRENT_USER;
+    RegKey::predef(HKEY_CURRENT_USER)
+        .open_subkey(RUN_KEY)
+        .and_then(|key| key.get_value::<String, _>(WIDGET_VALUE))
+        .is_ok()
+}
+
+/// Opens the widget at sign-in, or stops doing so.
+pub fn set_widget_autostart(on: bool) -> std::io::Result<()> {
+    use winreg::RegKey;
+    use winreg::enums::HKEY_CURRENT_USER;
+    let (key, _) = RegKey::predef(HKEY_CURRENT_USER).create_subkey(RUN_KEY)?;
+    if on {
+        let exe = std::env::current_exe()?;
+        key.set_value(WIDGET_VALUE, &format!("\"{}\" --widget", exe.display()))
+    } else {
+        match key.delete_value(WIDGET_VALUE) {
+            Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+            other => other,
+        }
+    }
+}
+
+/// The floating widget's page.
+pub fn widget_page(paths: &Paths, lang: Lang) -> String {
+    const HTML: &str = include_str!("../ui/widget.html");
+    let mut texts = serde_json::Map::new();
+    for (key, text) in lang
+        .section("ui.focus.")
+        .into_iter()
+        .chain(lang.section("ui.widget."))
+    {
+        texts.insert(key, Value::String(text));
+    }
+    let config: Config = Store::peek(&paths.config());
+    HTML.replace("__I18N__", &Value::Object(texts).to_string())
+        .replace(
+            "__THEME__",
+            &crate::web::theme_attribute(&config.appearance),
+        )
+        .replace("__FONT__", &crate::web::font_css())
+        .replace("__LANG__", lang.code())
 }
 
 /// The page with the catalog texts and the language filled in.

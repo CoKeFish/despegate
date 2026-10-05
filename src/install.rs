@@ -204,6 +204,7 @@ pub fn uninstall(paths: &Paths, lang: Lang) -> Result<(), String> {
     }
     let _ = RegKey::predef(HKEY_LOCAL_MACHINE).delete_subkey_all(UNINSTALL_KEY);
     let _ = start_menu_shortcut(None);
+    let _ = crate::ui::set_widget_autostart(false);
     let dir = target.to_string_lossy().into_owned();
     if let Err(e) = edit_machine_path(|path| path_without(path, &dir)) {
         println!(

@@ -496,3 +496,13 @@ apps = "Programa a mantener cerrado (repetible o separado por comas), p. ej. ste
 
 [cli.focus.stop]
 about = "Termina la sesión de enfoque (se rechaza si hay un bloqueo o descanso activo o cerca)"
+
+[ui.widget]
+off_hint = "Doble clic para activarlos."
+button = "Widget flotante"
+hint = "Una ventanita que se queda encima de las demás, con la cuenta atrás hasta el próximo descanso. Arrástrala a donde quieras; se abre también al iniciar sesión en Windows, hasta que la apagues."
+open = "Abrir despegate"
+close = "Apagar el widget"
+off = "Descansos apagados"
+next_long = "Ahora toca el largo"
+focusing = "Enfocado"
