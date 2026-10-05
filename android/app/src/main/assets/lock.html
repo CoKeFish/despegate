@@ -28,6 +28,8 @@
   h1 { font-size: 16.5vw; line-height: 0.9; letter-spacing: -0.04em; margin: 0 0 4vw -0.04em; font-weight: 900; color: var(--title); }
   p { margin: 0; }
   #until { font-size: 5.4vw; line-height: 1.2; font-weight: 800; }
+  /* On a break: something to do with the time. */
+  #idea { margin-top: 5vw; font-size: 6.4vw; line-height: 1.2; font-weight: 800; color: var(--title); text-wrap: balance; }
   #left { font-size: 5.4vw; line-height: 1.2; color: var(--muted); }
 
   /* The middle gives way: the photo shrinks and long reasons are set smaller. */
@@ -82,6 +84,7 @@
     <h1 id="title"></h1>
     <p id="until"></p>
     <p id="left"></p>
+    <p id="idea" hidden></p>
   </header>
   <div class="why">
     <div id="media"></div>
@@ -116,7 +119,8 @@
   const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
   tell({ kind: "theme", dark: true, bar: css("--screen") });
 
-  $("title").textContent = t("lock.title");
+  $("title").textContent = t(VIEW.idea ? "lock.rest_title" : "lock.title");
+  if (VIEW.idea) { $("idea").textContent = VIEW.idea; $("idea").hidden = false; }
   const until = new Date(VIEW.until);
   // The time is written the way the phone is set to: with am and pm, or around the clock.
   const hours = until.getHours(), mins = String(until.getMinutes()).padStart(2, "0");

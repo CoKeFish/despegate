@@ -57,6 +57,8 @@ class Enforcer(private val context: Context, private val core: Core) {
     private var hardened: Boolean? = null
     private var status = ""
     private var warning: String? = null
+    /** Whether the screen is locked for a break, to know when one ends. */
+    private var onBreak = false
 
     /** Starts looking at the clock; when already started, looks right now. */
     fun start() {
@@ -119,6 +121,11 @@ class Enforcer(private val context: Context, private val core: Core) {
             letGo()
         }
         if (power == Power.WATCH) Watch.instance?.closeFloating(mode is Mode.Lock, (mode as? Mode.Lock)?.allowed.orEmpty(), core.verdict.blocked)
+
+        // A break that ends is heard, so that one can come back without watching the clock.
+        val breaking = mode is Mode.Lock && mode.idea != null
+        if (onBreak && !breaking) notices.notify(BREAK_OVER_ID, notice(WARNINGS, "despegate", core.texts.tr("notice.break_over")).also { it.flags = it.flags and Notification.FLAG_ONGOING_EVENT.inv() })
+        onBreak = breaking
 
         warn((mode as? Mode.Banner)?.text)
         val headline = core.headline()
@@ -184,6 +191,7 @@ class Enforcer(private val context: Context, private val core: Core) {
         private const val WARNINGS = "warnings"
         const val STATUS_ID = 1
         private const val WARNING_ID = 2
+        private const val BREAK_OVER_ID = 3
     }
 }
 

@@ -8,6 +8,7 @@ import android.provider.OpenableColumns
 import android.text.format.DateFormat
 import io.github.cokefish.despegate.core.Clock
 import io.github.cokefish.despegate.core.Config
+import io.github.cokefish.despegate.core.DayLog
 import io.github.cokefish.despegate.core.Engine
 import io.github.cokefish.despegate.core.Headline
 import io.github.cokefish.despegate.core.Langs
@@ -125,6 +126,11 @@ class Core(private val context: Context) {
             locked = verdict.mode is Mode.Lock,
         )
         val breakStarted = state.advance(config, now, sensors)
+        // A focus session lasts until the long break, which may have just come.
+        if (config.focus != null && state.focusOver(config.breaks)) {
+            config = config.copy(focus = null)
+            write(configFile, config.toJson())
+        }
         verdict = if (power != Power.NONE) engine.decide(config, state, sensors, now, texts, apps::label) else Verdict(Mode.Idle, emptySet())
 
         val held = device.block(verdict.blocked, state.suspended)
@@ -147,8 +153,12 @@ class Core(private val context: Context) {
     @Synchronized
     fun whyBlocked(pkg: String): String {
         val until = config.activeBlocks(LocalDateTime.now()).filter { pkg in it.apps }.maxOfOrNull { it.until }
-        return if (until != null) texts.tr("banner.blocked", "app" to apps.label(pkg), "until" to time(until))
-        else texts.tr("banner.allowance_spent", "app" to apps.label(pkg))
+        return when {
+            until != null -> texts.tr("banner.blocked", "app" to apps.label(pkg), "until" to time(until))
+            config.focus?.apps?.contains(pkg) == true && pkg !in state.exhausted(config, LocalDateTime.now()) ->
+                texts.tr("banner.focus", "app" to apps.label(pkg))
+            else -> texts.tr("banner.allowance_spent", "app" to apps.label(pkg))
+        }
     }
 
     /** With nothing to lean on, nothing is being enforced. */
@@ -233,18 +243,41 @@ class Core(private val context: Context) {
      */
     private fun breakState(now: LocalDateTime): Any {
         val policy = config.breaks ?: return JSONObject.NULL
+        val until = state.onBreak(now)
+        val (phase, left, total) = when {
+            until != null && state.breakLong -> Triple("long", Duration.between(now, until), policy.longBreakMinutes * 60L)
+            until != null -> Triple("rest", Duration.between(now, until), policy.breakMinutes * 60L)
+            else -> Triple("work", state.breakDueIn(config) ?: Duration.ZERO, policy.workMinutes * 60L)
+        }
+        val duration = { secs: Long -> countdown(Duration.ofSeconds(secs)) }
+        val week = JSONArray((6L downTo 0L).map { back ->
+            val day = now.toLocalDate().minusDays(back)
+            val log = state.history[day] ?: DayLog()
+            JSONObject().put("day", texts.dayName(day.dayOfWeek)).put("minutes", log.workSecs / 60)
+                .put("work", duration(log.workSecs)).put("breaks", log.breaks).put("today", back == 0L)
+        })
+        val today = state.history[now.toLocalDate()] ?: DayLog()
         return JSONObject()
-            .put("used", countdown(Duration.ofSeconds(state.usageSecs)))
-            .put("left", countdown(state.breakDueIn(config) ?: Duration.ZERO))
-            .put("fraction", (state.usageSecs.toDouble() / (policy.workMinutes * 60)).coerceIn(0.0, 1.0))
-            .put("until", state.onBreak(now)?.let(::time) ?: JSONObject.NULL)
+            .put("phase", phase)
+            .put("left", countdown(left))
+            .put("left_secs", left.seconds.coerceAtLeast(0))
+            .put("total_secs", total)
+            .put("used", duration(state.usageSecs))
+            .put("cycle", state.cycle)
+            .put("cycles", policy.cycles)
+            .put("has_long", policy.hasLong)
+            .put("next_long", state.nextIsLong(policy))
+            .put("session", config.focus?.let { f -> JSONObject().put("apps", JSONArray(f.apps)).put("labels", JSONArray(f.apps.map(apps::label))) } ?: JSONObject.NULL)
+            .put("today", JSONObject().put("work", duration(today.workSecs)).put("breaks", today.breaks))
+            .put("week", week)
+            .put("streak", state.streak(now.toLocalDate()))
     }
 
     /** What changes by the second, for the page to keep up with without redrawing itself whole. */
     @Synchronized
     fun pulse(): JSONObject {
         setClock()
-        return JSONObject().put("headline", headline()).put("break", breakState(LocalDateTime.now())).put("hour12", Clock.twelveHour)
+        return JSONObject().put("headline", headline()).put("focus", breakState(LocalDateTime.now())).put("hour12", Clock.twelveHour)
     }
 
     /** Times are written as the settings say: with am and pm, around the clock, or the way the phone does. */
@@ -279,7 +312,7 @@ class Core(private val context: Context) {
             .put("labels", JSONObject(referenced.associateWith(apps::label)))
             .put("locked_in", Service.lockedIn(config, state, now, t) ?: JSONObject.NULL)
             .put("headline", headline())
-            .put("break", breakState(now))
+            .put("focus", breakState(now))
             .put("hour12", Clock.twelveHour)
     }
 
@@ -293,6 +326,7 @@ class Core(private val context: Context) {
         .put("allowed", JSONArray(lock.allowed.filter { apps.launchIntent(it) != null }.map { JSONObject().put("pkg", it).put("label", apps.label(it)) }))
         .put("phrase", texts.tr("uninstall.phrase"))
         .put("hour12", Clock.twelveHour)
+        .put("idea", lock.idea ?: JSONObject.NULL)
 
     private fun mediaJson(names: List<String>): JSONArray = JSONArray(
         names.mapNotNull { name ->

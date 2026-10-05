@@ -14,6 +14,7 @@ import android.view.accessibility.AccessibilityWindowInfo
 import android.widget.Toast
 import io.github.cokefish.despegate.core
 import io.github.cokefish.despegate.core.Mode
+import io.github.cokefish.despegate.ui.LockActivity
 
 /**
  * How despegate enforces on a phone it does not own: as an accessibility
@@ -180,9 +181,16 @@ class Watch : AccessibilityService() {
             return setOfNotNull(keyboard, "android", "com.android.systemui", "com.google.android.permissioncontroller", "com.android.permissioncontroller")
         }
 
-        /** Whether [pkg] may be in front while the screen is locked around [allowed]. Not knowing what is in front does not pass. */
-        fun passes(context: Context, pkg: String?, allowed: List<String>): Boolean =
-            pkg != null && (pkg == context.packageName || pkg in allowed || pkg in CLOCKS || pkg in context.core.device.dialers())
+        /**
+         * Whether [pkg] may be in front while the screen is locked around [allowed].
+         * Of despegate itself only the lock screen passes: its settings would be a way
+         * out. Not knowing what is in front does not pass.
+         */
+        fun passes(context: Context, pkg: String?, allowed: List<String>): Boolean = when (pkg) {
+            null -> false
+            context.packageName -> LockActivity.visible
+            else -> pkg in allowed || pkg in CLOCKS || pkg in context.core.device.dialers()
+        }
 
         /** Switches the service off: the way out when despegate does not own the phone. */
         fun leave() {

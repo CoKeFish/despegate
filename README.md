@@ -18,7 +18,9 @@ The Windows desktop version works. It is young; expect rough edges. An Android v
 
 - **Blocks on a schedule.** A rule covers a time window on chosen days, e.g. every night from 23:00 to 07:00.
 - **Blocks right now.** `despegate now --for 45m --lock` starts a block that cannot be cancelled.
-- **Forces breaks.** After a stretch of continuous use the screen locks for a while. Only time at the keyboard or mouse counts, and stepping away on your own for as long as the break lasts counts as taking it.
+- **Forces breaks, like a pomodoro.** After a stretch of continuous use the screen locks for a while, and every few breaks one is longer. Only time at the keyboard or mouse counts, and stepping away on your own for as long as the break lasts counts as taking it. The break screen suggests something to do with the time, and a chime says when it is over.
+- **Keeps you focused.** A focus session keeps the programs you choose closed while you work; breaks let them through, and the session ends on its own at the long break.
+- **Keeps a history.** The Focus page shows the countdown to the next break, the round of the cycle, and the use and breaks of the last seven days, with your streak of days with breaks.
 - **Limits programs per day.** A program can be given a daily allowance, counted only while its window is in front. When it is spent the program is closed until the next day.
 - **Locks the screen.** A lock covers every monitor, stays on top, swallows Alt+Tab, the Windows key and Alt+F4, and closes Task Manager. It shows the time left and your reasons for installing despegate: your own words, and the photos and videos you add to them.
 - **Closes programs.** A block can name executables (`steam.exe`, ...). They are closed while the block is active, and closed again if you reopen them.
@@ -33,6 +35,10 @@ despegate is meant to be hard to switch off in the heat of the moment, not to tr
 
 - **Uninstall.** `despegate uninstall` (or *Settings → Apps*) always works for an administrator. It first shows the reasons you wrote and asks you to confirm by typing a phrase.
 - **Emergency pause.** The lock screen shows a random text. Typing it exactly (80 characters by default) pauses everything for 5 minutes — enough for a real emergency, or to uninstall. Set `emergency-chars` to `0` to remove this exit; then a mistaken lock rule can only be waited out.
+
+## Download
+
+The latest release is on [despegate.suchima.com](https://despegate.suchima.com) and on the [releases page](https://github.com/CoKeFish/despegate/releases/latest): a `.zip` with the Windows executables, and the Android `.apk`.
 
 ## Install
 
@@ -83,7 +89,7 @@ The same things can be done from the settings window (`despegate ui`). It opens 
 
 Anything that makes despegate stricter is accepted at any time: a new rule (even one that is active immediately), shorter work periods, a smaller allowance.
 
-Anything that loosens it is refused while a block or break is active or about to start. In addition, a program's allowance cannot be raised or removed on a day the program has already been used.
+Anything that loosens it is refused while a block or break is active or about to start. "About to start" means within `lead-minutes` of a block (30 by default), and within `warn-minutes` of a break (5 by default): breaks are a choice, so for most of a work period they can still be changed or turned off. Ending a focus session counts as loosening. In addition, a program's allowance cannot be raised or removed on a day the program has already been used.
 
 ### Settings
 

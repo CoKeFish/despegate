@@ -36,11 +36,13 @@ class LockActivity : Activity() {
 
     override fun onResume() {
         super.onResume()
+        visible = true
         handler.removeCallbacks(watch)
         handler.post(watch)
     }
 
     override fun onPause() {
+        visible = false
         handler.removeCallbacks(watch)
         super.onPause()
     }
@@ -92,6 +94,11 @@ class LockActivity : Activity() {
 
     companion object {
         private var current = WeakReference<LockActivity>(null)
+
+        /** Whether the lock screen is what the screen shows right now. */
+        @Volatile
+        var visible = false
+            private set
 
         /** Takes the lock screen down, wherever it is. */
         fun dismiss() {

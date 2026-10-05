@@ -23,6 +23,8 @@ sealed interface Mode {
         val challenge: String?,
         val emergencyMinutes: Int,
         val allowed: List<String>,
+        /** Something to do with the time, when the lock is a break. */
+        val idea: String? = null,
     ) : Mode
 }
 
@@ -46,8 +48,10 @@ class Engine(private val random: Random = SecureRandom()) {
         val blocks = config.activeBlocks(now).toMutableList()
         state.onBreak(now)?.let { blocks += ActiveBlock("break", it, lock = true, apps = emptyList()) }
         val exhausted = state.exhausted(config, now)
+        // A focus session keeps its apps blocked while working; breaks let them through.
+        val focusing = config.focus?.takeIf { state.onBreak(now) == null }?.apps.orEmpty()
         val lockUntil = blocks.filter { it.lock }.maxOfOrNull { it.until }
-        val enforcing = blocks.isNotEmpty() || exhausted.isNotEmpty()
+        val enforcing = blocks.isNotEmpty() || exhausted.isNotEmpty() || focusing.isNotEmpty()
 
         val paused = pausedUntil
         val verdict = when {
@@ -55,10 +59,11 @@ class Engine(private val random: Random = SecureRandom()) {
                 Verdict(Mode.Banner(t.tr("banner.paused", "left" to countdown(Duration.between(now, paused)))), emptySet())
             paused != null -> Verdict(warning(config, state, sensors, now, t, label), emptySet())
             else -> {
-                val blocked = blocks.flatMap { it.apps }.toSet() + exhausted
+                val blocked = blocks.flatMap { it.apps }.toSet() + exhausted + focusing
                 val mode = if (lockUntil != null) {
                     if (challenge == null && config.emergencyChars > 0) challenge = newChallenge(config.emergencyChars)
-                    Mode.Lock(lockUntil, config.reasons, config.media, challenge, config.emergencyMinutes, config.allowed - blocked)
+                    val idea = state.onBreak(now)?.let { t.tr("break.idea_${Math.floorMod(it.toLocalTime().toSecondOfDay() / 60, IDEAS) + 1}") }
+                    Mode.Lock(lockUntil, config.reasons, config.media, challenge, config.emergencyMinutes, config.allowed - blocked, idea)
                 } else {
                     warning(config, state, sensors, now, t, label)
                 }
@@ -99,6 +104,11 @@ class Engine(private val random: Random = SecureRandom()) {
         return warnings.filter { it.first <= warn }.minByOrNull { it.first }?.let { Mode.Banner(it.second) } ?: Mode.Idle
     }
 
+    private companion object {
+        /** How many break ideas the catalogs hold (`break.idea_1` and on). */
+        const val IDEAS = 8
+    }
+
     /** Groups of five characters, without the ones that are easily confused. */
     private fun newChallenge(length: Int): String {
         val alphabet = "abcdefghjkmnpqrstuvwxyz23456789"
@@ -125,6 +135,7 @@ object Headline {
                 val apps = blocks.flatMap { it.apps }.distinct().joinToString(", ", transform = label)
                 "blocking" to t.tr("ui.hero.blocking", "apps" to apps, "until" to t.whenAt(blocks.maxOf { it.until }))
             }
+            config.focus != null -> "focus" to t.tr("ui.hero.focus")
             else -> "free" to t.tr("ui.hero.free")
         }
 

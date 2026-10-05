@@ -12,7 +12,7 @@ There are two ways for despegate to enforce anything, and it uses the stronger o
 
 - **Lock the screen**: whenever an app that is not allowed comes to the front, despegate puts its lock page back. Calls always work, and so do the apps on the allowed list.
 - **Block apps**: a blocked app is sent back to the home screen with a word on until when. A video it left floating over the screen is dragged away.
-- **Hold its ground**: while a block is active or about to start, the settings screens that name despegate (its accessibility switch, its app info, the uninstall dialog) are closed too.
+- **Hold its ground**: while a block is active or about to start, the settings screens that name despegate (its accessibility switch, its app info, the uninstall dialog) are closed too. During a lock only the lock page of despegate itself stays in front, not its settings.
 
 It makes leaving hard and uncomfortable, not impossible: outside those moments the service can be switched off from the phone's settings.
 
@@ -23,6 +23,10 @@ It makes leaving hard and uncomfortable, not impossible: outside those moments t
 - **Close the side doors**: safe mode and extra users are off, and the clock cannot be changed while a block is active or about to start.
 
 What no app can prevent: switching the phone off, and wiping it from recovery mode.
+
+## Focus
+
+The second tab is the pomodoro side, as on the desktop: forced breaks after a stretch of use, a long one every few, a live countdown with the round of the cycle, and the last seven days of use and breaks. A focus session blocks the apps you pick while you work and ends on its own at the long break. Each break suggests something to do, and a notification says when it is over. Breaks can be changed or turned off until their warning is up (`warn-minutes`, 5 by default).
 
 ## Building
 

@@ -1,6 +1,6 @@
 [package]
 name = "despegate"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2024"
 license = "GPL-3.0-only"
 description = "Intrusive blocker that forces you to step away from the computer"

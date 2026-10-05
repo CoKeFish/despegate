@@ -38,7 +38,18 @@ fun parseClock(text: String): LocalTime? = runCatching { LocalTime.parse(text) }
  * [breakMinutes]. Putting the phone down for that long on your own counts as
  * the break.
  */
-data class BreakPolicy(val workMinutes: Int, val breakMinutes: Int)
+data class BreakPolicy(
+    val workMinutes: Int,
+    val breakMinutes: Int,
+    /** Every [cycles]-th break lasts this long instead; 0 leaves every break short. */
+    val longBreakMinutes: Int = 0,
+    val cycles: Int = 4,
+) {
+    val hasLong: Boolean get() = longBreakMinutes > 0 && cycles > 1
+}
+
+/** Apps kept blocked while working, until the next long break. Breaks let them through. */
+data class Focus(val apps: List<String>, val started: LocalDateTime)
 
 /** [app] may be in front for [minutes] per day; after that it is blocked until the next day. */
 data class Allowance(val app: String, val minutes: Int)
@@ -102,6 +113,8 @@ data class Config(
     val emergencyChars: Int = 80,
     val emergencyMinutes: Int = 5,
     val breaks: BreakPolicy? = null,
+    /** A focus session under way. */
+    val focus: Focus? = null,
     val allowances: List<Allowance> = emptyList(),
     val rules: List<Rule> = emptyList(),
     val oneoffs: List<OneOff> = emptyList(),
@@ -132,7 +145,11 @@ data class Config(
         put("warn_minutes", warnMinutes)
         put("emergency_chars", emergencyChars)
         put("emergency_minutes", emergencyMinutes)
-        put("breaks", breaks?.let { JSONObject().put("work_minutes", it.workMinutes).put("break_minutes", it.breakMinutes) } ?: JSONObject.NULL)
+        put("breaks", breaks?.let {
+            JSONObject().put("work_minutes", it.workMinutes).put("break_minutes", it.breakMinutes)
+                .put("long_break_minutes", it.longBreakMinutes).put("cycles", it.cycles)
+        } ?: JSONObject.NULL)
+        put("focus", focus?.let { JSONObject().put("apps", JSONArray(it.apps)).put("started", stamp(it.started)) } ?: JSONObject.NULL)
         put("allowances", JSONArray(allowances.map { JSONObject().put("app", it.app).put("minutes", it.minutes) }))
         put("rules", JSONArray(rules.map { rule ->
             JSONObject()
@@ -163,7 +180,12 @@ data class Config(
                 warnMinutes = json.optInt("warn_minutes", base.warnMinutes),
                 emergencyChars = json.optInt("emergency_chars", base.emergencyChars),
                 emergencyMinutes = json.optInt("emergency_minutes", base.emergencyMinutes),
-                breaks = json.optJSONObject("breaks")?.let { BreakPolicy(it.optInt("work_minutes"), it.optInt("break_minutes")) },
+                breaks = json.optJSONObject("breaks")?.let {
+                    BreakPolicy(it.optInt("work_minutes"), it.optInt("break_minutes"), it.optInt("long_break_minutes"), it.optInt("cycles", 4))
+                },
+                focus = json.optJSONObject("focus")?.let { f ->
+                    parseStamp(f.optString("started"))?.let { Focus(f.strings("apps"), it) }
+                },
                 allowances = json.objects("allowances").map { Allowance(it.optString("app"), it.optInt("minutes")) },
                 rules = json.objects("rules").mapNotNull(::ruleFromJson),
                 oneoffs = json.objects("oneoffs").mapNotNull {

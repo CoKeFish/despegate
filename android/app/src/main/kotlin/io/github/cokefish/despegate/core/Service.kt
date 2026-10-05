@@ -35,8 +35,18 @@ object Service {
                 "now" -> startNow(cfg, request.optInt("minutes"), request.optBoolean("lock"), request.strings("apps"), now, rt, t)
                 "reasons_set" -> cfg.copy(reasons = request.optString("text").trim()) to t.tr("reasons.saved")
                 "set" -> set(cfg, request.optString("key"), request.optInt("value", -1), now, rt, t)
-                "break_set" -> breakSet(cfg, BreakPolicy(request.optInt("work_minutes"), request.optInt("break_minutes")), now, rt, t)
+                "break_set" -> breakSet(
+                    cfg,
+                    BreakPolicy(request.optInt("work_minutes"), request.optInt("break_minutes"), request.optInt("long_break_minutes"), request.optInt("cycles", 4)),
+                    now, rt, t,
+                )
                 "break_off" -> breakSet(cfg, null, now, rt, t)
+                "focus_start" -> focusStart(cfg, request.strings("apps"), now, rt, t)
+                "focus_stop" -> {
+                    if (cfg.focus == null) throw Refused(t.tr("error.no_focus"))
+                    mayLoosen(cfg, now, rt, t)
+                    cfg.copy(focus = null) to t.tr("focus.stopped")
+                }
                 "allowance_set" -> allowanceSet(cfg, request.optString("app"), request.optInt("minutes"), now, rt, t)
                 "allowance_remove" -> allowanceSet(cfg, request.optString("app"), null, now, rt, t)
                 "allowed_set" -> allowedSet(cfg, request.strings("apps"), now, rt, t)
@@ -82,10 +92,10 @@ object Service {
                 return t.tr("why.block_imminent", "name" to rule.name, "start" to time(start), "lead" to cfg.leadMinutes)
             }
         }
-        // With short work periods the full lead time would never leave a window
-        // in which the break policy can be changed.
+        // Breaks are a choice, not a sentence: they close in only once their
+        // warning is up. Short work periods shrink that further.
         val policy = cfg.breaks ?: return null
-        val lead = minOf(cfg.leadMinutes, policy.workMinutes / 2)
+        val lead = minOf(cfg.warnMinutes, policy.workMinutes / 2)
         val due = state.breakDueIn(cfg) ?: return null
         return if (due <= Duration.ofMinutes(lead.toLong())) t.tr("why.break_imminent", "left" to countdown(due)) else null
     }
@@ -207,17 +217,39 @@ object Service {
         if (policy != null) {
             if (policy.workMinutes !in 5..480) throw Refused(t.tr("error.break_work_range"))
             if (policy.breakMinutes !in 1..120) throw Refused(t.tr("error.break_rest_range"))
+            if (policy.longBreakMinutes != 0 && policy.longBreakMinutes !in policy.breakMinutes + 1..180) throw Refused(t.tr("error.break_long_range"))
+            if (policy.longBreakMinutes != 0 && policy.cycles !in 2..12) throw Refused(t.tr("error.break_cycles_range"))
         }
         val old = cfg.breaks
         val weaker = when {
-            old != null && policy != null -> policy.workMinutes > old.workMinutes || policy.breakMinutes < old.breakMinutes
+            old != null && policy != null -> {
+                // A long break is loosened by shortening it, spacing it out or dropping it.
+                val longLooser = old.hasLong && (!policy.hasLong || policy.longBreakMinutes < old.longBreakMinutes || policy.cycles > old.cycles)
+                policy.workMinutes > old.workMinutes || policy.breakMinutes < old.breakMinutes || longLooser
+            }
             old != null -> true
             policy != null -> false
             else -> throw Refused(t.tr("error.break_already_off"))
         }
         if (weaker) mayLoosen(cfg, now, rt, t)
-        val message = policy?.let { t.tr("break.set", "rest" to it.breakMinutes, "work" to it.workMinutes) } ?: t.tr("break.off")
-        return cfg.copy(breaks = policy) to message
+        val message = when {
+            policy == null -> t.tr("break.off")
+            policy.hasLong -> t.tr("break.set_long", "rest" to policy.breakMinutes, "work" to policy.workMinutes, "long" to policy.longBreakMinutes, "cycles" to policy.cycles)
+            else -> t.tr("break.set", "rest" to policy.breakMinutes, "work" to policy.workMinutes)
+        }
+        return cfg.copy(breaks = policy, focus = if (policy == null) null else cfg.focus) to message
+    }
+
+    /** Starting a focus session, or adding apps to one, only tightens. */
+    private fun focusStart(cfg: Config, apps: List<String>, now: LocalDateTime, rt: Runtime, t: Texts): Pair<Config, String> {
+        val policy = cfg.breaks ?: throw Refused(t.tr("error.focus_needs_breaks"))
+        val added = normalizeApps(apps, rt, t)
+        if (added.isEmpty()) throw Refused(t.tr("error.focus_no_apps"))
+        val old = cfg.focus
+        val all = (old?.apps.orEmpty() + added).distinct()
+        val names = all.joinToString(", ", transform = rt.label)
+        val message = t.tr(if (policy.hasLong) "focus.started_long" else "focus.started", "apps" to names)
+        return cfg.copy(focus = Focus(all, old?.started ?: now)) to message
     }
 
     private fun allowanceSet(cfg: Config, app: String, minutes: Int?, now: LocalDateTime, rt: Runtime, t: Texts): Pair<Config, String> {

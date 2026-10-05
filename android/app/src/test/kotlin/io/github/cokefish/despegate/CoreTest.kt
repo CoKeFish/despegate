@@ -122,6 +122,62 @@ class CoreTest {
         assertEquals(0, rested.usageSecs)
     }
 
+    private val pomodoro = Config(breaks = BreakPolicy(25, 5, longBreakMinutes = 20, cycles = 4))
+
+    /** Uses the phone until the next forced break starts; returns when it does. */
+    private fun workUntilBreak(state: State, cfg: Config, from: LocalDateTime): LocalDateTime {
+        var now = from
+        while (!state.advance(cfg, now, Sensors())) now = now.plusSeconds(1)
+        return now
+    }
+
+    @Test
+    fun everyFourthBreakIsTheLongOne() {
+        val state = State()
+        var now = at(9)
+        val lengths = ArrayList<Long>()
+        repeat(5) {
+            now = workUntilBreak(state, pomodoro, now)
+            val until = state.onBreak(now)!!
+            lengths += java.time.Duration.between(now, until).toMinutes()
+            now = until.plusSeconds(1)
+        }
+        assertEquals(listOf(5L, 5L, 5L, 20L, 5L), lengths)
+        assertEquals(5, state.history[at(9).toLocalDate()]!!.breaks)
+        assertEquals(1, state.streak(at(9).toLocalDate()))
+    }
+
+    @Test
+    fun aFocusSessionBlocksItsAppsWhileWorkingAndEndsAtTheLongBreak() {
+        var cfg = ask(pomodoro, State(), at(9), "focus_start", "apps" to JSONArray(listOf("com.example.game"))).config
+        assertNotNull(cfg.focus)
+        val state = State()
+        val engine = Engine()
+        assertEquals(setOf("com.example.game"), engine.decide(cfg, state, Sensors(), at(9), en).blocked)
+        // On a break the app is let through, and the screen shows something to do.
+        val now = workUntilBreak(state, cfg, at(9))
+        val lock = engine.decide(cfg, state, Sensors(locked = true), now, en)
+        assertTrue(lock.blocked.isEmpty())
+        assertNotNull((lock.mode as Mode.Lock).idea)
+        assertFalse(state.focusOver(cfg.breaks))
+        // Three more rounds bring the long break, which ends the session.
+        var at = state.onBreak(now)!!.plusSeconds(1)
+        repeat(3) { at = state.onBreak(workUntilBreak(state, cfg, at))!!.plusSeconds(1) }
+        assertTrue(state.focusOver(cfg.breaks))
+        // Without breaks there is no session.
+        cfg = ask(cfg.copy(breaks = null), State(), at(9), "focus_start", "apps" to JSONArray(listOf("com.example.game"))).config
+        assertNull(cfg.breaks)
+    }
+
+    @Test
+    fun breaksCanBeTurnedOffUntilTheirWarning() {
+        val cfg = Config(breaks = BreakPolicy(50, 10), warnMinutes = 5)
+        val early = State(usageSecs = 30 * 60)
+        val near = State(usageSecs = 46 * 60)
+        assertTrue(ask(cfg, early, at(12), "break_off").ok)
+        assertFalse(ask(cfg, near, at(12), "break_off").ok)
+    }
+
     @Test
     fun aSpentAllowanceBlocksTheAppUntilTheNextDay() {
         val cfg = Config(allowances = listOf(Allowance("com.example.game", 1)))
