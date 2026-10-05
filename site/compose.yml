@@ -1,0 +1,27 @@
+# The landing page on the VPS, behind the proxy Coolify already runs (Traefik
+# on the `coolify` network), which also gets the certificate.
+#
+# To publish or update it, on the VPS:
+#   cd /opt/despegate && git pull && docker compose -f site/compose.yml up -d --build
+services:
+  site:
+    build: .
+    container_name: despegate-site
+    restart: unless-stopped
+    networks: [coolify]
+    labels:
+      traefik.enable: "true"
+      traefik.docker.network: coolify
+      traefik.http.routers.despegate-site-http.entrypoints: http
+      traefik.http.routers.despegate-site-http.rule: Host(`despegate.suchima.com`)
+      traefik.http.routers.despegate-site-http.middlewares: despegate-site-https
+      traefik.http.middlewares.despegate-site-https.redirectscheme.scheme: https
+      traefik.http.routers.despegate-site.entrypoints: https
+      traefik.http.routers.despegate-site.rule: Host(`despegate.suchima.com`)
+      traefik.http.routers.despegate-site.tls: "true"
+      traefik.http.routers.despegate-site.tls.certresolver: letsencrypt
+      traefik.http.services.despegate-site.loadbalancer.server.port: "80"
+
+networks:
+  coolify:
+    external: true
